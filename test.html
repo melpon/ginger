@@ -1,0 +1,40 @@
+<html>
+<head>
+</head>
+<body>
+  <p>${value}</p>
+  $for x in xs {{ <p>${x}</p> }}
+  $if x {{
+    <section>${x}</section>
+  }}
+  $if p {{
+    <p>p</p>
+  }} $elseif q {{
+    <p>q</p>
+  }} $else {{
+    <p>else</p>
+  }}
+
+  $#escaped output '<p>${value}</p>'
+  <p>$${value}</p>
+
+  $if x {{
+    <pre>
+      $# escaped
+      ${{
+      $}}
+    </pre>
+  }}
+</body>
+</html>
+
+$# <char> = any character without '$'
+$# <comment-char> = any character without '\n'
+$# <var> = any character without ' ' or '}'
+$# <block> = (<char> | <$comment> | <$for> | <$if> | <$variable> | $$ | ${{ | $}}) <block>
+$# <$comment> = $#<comment-char>*
+$# <$for> = $for <var> in <var> {{ <block> }}
+$# <$if> = $if <var> {{ <block> }} ($elseif <var> {{ <block> }})? ($else {{ <block> }})?
+$# <$variable> = ${<var>}
+$# <root> = <block>
+
