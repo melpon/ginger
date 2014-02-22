@@ -4,6 +4,7 @@
 #include <utility>
 #include <map>
 #include <vector>
+#include <cassert>
 
 std::string getStdin() {
     std::string output;
@@ -51,7 +52,7 @@ class object {
         }
         template<class>
         bool cond_(...) const {
-            throw 0;
+            throw __LINE__;
         }
         virtual bool cond() const override {
             return cond_<T>(0);
@@ -63,7 +64,7 @@ class object {
         }
         template<class>
         iterator begin_(...) {
-            throw 0;
+            throw __LINE__;
         }
         virtual iterator xbegin() override {
             return begin_<T>(0);
@@ -75,7 +76,7 @@ class object {
         }
         template<class>
         iterator end_(...) {
-            throw 0;
+            throw __LINE__;
         }
         virtual iterator xend() override {
             return end_<T>(0);
@@ -85,9 +86,9 @@ class object {
         std::string str_(int) const {
             return std::to_string(obj);
         }
-        template<class>
+        template<class U>
         std::string str_(...) const {
-            throw 0;
+            throw __LINE__;
         }
         virtual std::string str() const override {
             return str_<T>(0);
@@ -157,149 +158,248 @@ bool iterator::operator!=(iterator it) const {
 }
 
 typedef std::map<std::string, object> tmpl;
+typedef std::map<std::string, std::vector<object>> tmpl_context;
 
+template<class Iterator>
 class parser {
 public:
-    std::string input;
-    int index;
-    parser(std::string input) : input(std::move(input)), index(0) { }
+    Iterator current_;
+    Iterator next_;
+    Iterator last_;
+
+    void skip_(int n, std::forward_iterator_tag) {
+        while (n != 0) {
+            read();
+            --n;
+        }
+    }
+    void skip_(int n, std::random_access_iterator_tag) {
+        if (last_ - current_ < n)
+            throw __LINE__;
+        current_ += n;
+        next_ += n - 1;
+        if (next_ != last_)
+            ++next_;
+    }
+
+public:
+    typedef std::pair<Iterator, Iterator> range_t;
+
+    parser(Iterator first, Iterator last) : next_(first), last_(last) {
+        assert(first != last);
+        current_ = next_++;
+    }
+
+    void skip(int n) {
+        skip_(n, typename std::iterator_traits<Iterator>::iterator_category());
+    }
     void read() {
-        if (index >= input.length()) throw 0;
-        input[index++];
+        if (current_ == last_)
+            throw __LINE__;
+        current_ = next_;
+        if (next_ != last_)
+            ++next_;
+    }
+
+    explicit operator bool() const {
+        return current_ != last_;
     }
     char peek() const {
-        if (index >= input.length()) throw 0;
-        return input[index];
+        if (current_ == last_)
+            throw __LINE__;
+        return *current_;
+    }
+    bool has_next() const {
+        return next_ != last_;
     }
     char next() const {
-        if (index + 1 >= input.length()) throw 0;
-        return input[index + 1];
+        if (next_ == last_)
+            throw __LINE__;
+        return *next_;
+    }
+
+    Iterator save() const {
+        return current_;
+    }
+    void load(Iterator context) {
+        current_ = next_ = context;
+        if (next_ != last_)
+            ++next_;
+    }
+
+    template<class F>
+    range_t read_while(F f) {
+        if (current_ == last_)
+            throw __LINE__;
+        auto first = current_;
+        while (f(*current_))
+            read();
+        return std::make_pair(first, current_);
+    }
+    template<class F>
+    range_t read_while_next(F f) {
+        if (current_ == last_)
+            throw __LINE__;
+        auto first = current_;
+        while (f(*current_, has_next(), has_next() ? *next_ : 0))
+            read();
+        return std::make_pair(first, current_);
+    }
+    void eat(char c) {
+        if (peek() != c)
+            throw __LINE__;
+        read();
+    }
+    template<class F>
+    void eat_f(F f) {
+        if (not f(peek()))
+            throw __LINE__;
+        read();
     }
 };
 
-void block(parser& p, tmpl& dic) {
-    char c = p.peek();
-    if (c == '}' && p.next() == '}') {
-        p.read();
-        p.read();
-        return;
-    } else if (c != '$') {
-        std::cout << c;
-        p.read();
-    } else {
-        p.read();
-        char d = p.peek();
-        if (d == '$') {
+template<class Iterator>
+void block(parser<Iterator>& p, tmpl& dic, tmpl_context& ctx, bool not_skip=true) {
+    while (p) {
+        char c = p.peek();
+        if (c == '}' && p.has_next() && p.next() == '}') {
+            break;
+        } else if (c != '$') {
+            if (not_skip) std::cout << c;
             p.read();
-            std::cout << d;
-        } else if (d == '#') {
-            p.read();
-            while (p.peek() != '\n')
-                p.read();
-        } else if (d == '{') {
-            p.read();
-            d = p.peek();
-            if (d == '{') {
-                p.read();
-                std::cout << "{{";
-            } else {
-                std::cout << "[variable(";
-                do {
-                    std::cout << d;
-                    p.read();
-                    d = p.peek();
-                } while (d != '}' && d != ' ');
-                p.read();
-                std::cout << ")]";
-            }
-        } else if (d == '}') {
-            p.read();
-            d = p.peek();
-            if (d == '}') {
-                p.read();
-                std::cout << "}}";
-            } else {
-                throw 0;
-            }
         } else {
-            std::string name;
-            do {
-                name.push_back(d);
+            p.read();
+            c = p.peek();
+            if (c == '$') {
                 p.read();
-                d = p.peek();
-            } while (d != ' ');
-            if (name == "for") {
-                while (p.peek() == ' ') p.read();
-                std::string var1;
-                while (p.peek() != ' ') {
-                    var1.push_back(p.peek());
+                if (not_skip) std::cout << '$';
+            } else if (c == '#') {
+                // skip comments
+                p.read_while([](char peek) {
+                    return peek != '\n';
+                });
+            } else if (c == '{') {
+                p.read();
+                c = p.peek();
+                if (c == '{') {
                     p.read();
-                }
-                while (p.peek() == ' ') p.read();
-                while (p.peek() != ' ') p.read();
-                while (p.peek() == ' ') p.read();
-                std::string var2;
-                while (p.peek() != ' ') {
-                    var2.push_back(p.peek());
-                    p.read();
-                }
-                while (p.peek() == ' ') p.read();
-                while (p.peek() == '{') p.read();
-                auto index = p.index;
-                auto index2 = -1;
-                for (object v: dic[var2]) {
-                    block(p, dic);
-                    index2 = p.index;
-                    p.index = index;
-                }
-                if (index2 == -1) {
-                    while (p.peek() != '}' || p.next() != '}')
-                        p.read();
-                    p.read();
-                    p.read();
+                    if (not_skip) std::cout << "{{";
                 } else {
-                    p.index = index2;
+                    auto r = p.read_while([](char peek) {
+                        return peek != '}';
+                    });
+                    p.eat('}');
+
+                    if (not_skip) {
+                        std::string var = std::string(r.first, r.second);
+                        auto it = ctx.find(var);
+                        if (it != ctx.end() && not it->second.empty()) {
+                            std::cout << it->second.back().str();
+                        } else {
+                            std::cout << dic[var].str();
+                        }
+                    }
                 }
-            } else if (name == "if") {
-                std::cout << "$if block";
-                while (p.peek() == ' ') p.read();
-                std::string var1;
-                while (p.peek() != ' ') {
-                    var1.push_back(p.peek());
+            } else if (c == '}') {
+                p.read();
+                c = p.peek();
+                if (c == '}') {
                     p.read();
+                    if (not_skip) std::cout << "}}";
+                } else {
+                    throw __LINE__;
                 }
-                while (p.peek() == ' ') p.read();
-                while (p.peek() == '{') p.read();
-                block(p, dic);
-            } else if (name == "elseif") {
-                std::cout << "$elseif block";
-                while (p.peek() == ' ') p.read();
-                std::string var1;
-                while (p.peek() != ' ') {
-                    var1.push_back(p.peek());
-                    p.read();
+            } else {
+                auto ws = [](char peek) { return peek <= 32; };
+                auto token = [](char peek) { return peek > 32; };
+
+                auto r = p.read_while(token);
+                std::string command(r.first, r.second);
+
+                if (command == "for") {
+                    p.read_while(ws);
+                    r = p.read_while(token);
+                    std::string var1(r.first, r.second);;
+                    p.read_while(ws);
+                    p.eat('i');
+                    p.eat('n');
+                    p.eat_f(ws);
+                    p.read_while(ws);
+                    r = p.read_while([token](char peek) { return token(peek) && peek != '{'; });
+                    std::string var2(r.first, r.second);
+                    p.read_while(ws);
+                    p.eat('{');
+                    p.eat('{');
+
+                    auto context = p.save();
+                    auto& vec = ctx[var1];
+                    for (object v: dic[var2]) {
+                        vec.push_back(v);
+                        block(p, dic, ctx);
+                        vec.pop_back();
+                        p.load(context);
+                    }
+                    block(p, dic, ctx, false);
+                    p.eat('}');
+                    p.eat('}');
+                } else if (command == "if") {
+                    p.read_while(ws);
+                    r = p.read_while([token](char peek) { return token(peek) && peek != '{'; });
+                    std::string var(r.first, r.second);
+                    p.read_while(ws);
+                    p.eat('{');
+                    p.eat('{');
+                    bool run = static_cast<bool>(dic[var]);
+                    block(p, dic, ctx, run);
+                    while (true) {
+                        p.eat('}');
+                        p.eat('}');
+                        auto context = p.save();
+                        p.read_while(ws);
+                        c = p.peek();
+                        if (c == '$') {
+                            p.read();
+                            r = p.read_while([token](char peek) { return token(peek) && peek != '{'; });
+                            std::string command(r.first, r.second);
+                            if (command == "elseif") {
+                                p.read_while(ws);
+                                r = p.read_while([token](char peek) { return token(peek) && peek != '{'; });
+                                std::string var(r.first, r.second);
+                                p.read_while(ws);
+                                p.eat('{');
+                                p.eat('{');
+                                bool run_ = static_cast<bool>(dic[var]);
+                                block(p, dic, ctx, not run && run_);
+                                if (not run && run_)
+                                    run = true;
+                            } else if (command == "else") {
+                                p.read_while(ws);
+                                p.eat('{');
+                                p.eat('{');
+                                block(p, dic, ctx, not run);
+                                p.eat('}');
+                                p.eat('}');
+                                break;
+                            } else {
+                                p.load(context);
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                } else {
+                    throw __LINE__;
                 }
-                while (p.peek() == ' ') p.read();
-                while (p.peek() == '{') p.read();
-                block(p, dic);
-            } else if (name == "else") {
-                std::cout << "$else block";
-                while (p.peek() == ' ') p.read();
-                while (p.peek() == '{') p.read();
-                block(p, dic);
             }
         }
     }
-    block(p, dic);
 }
 
 void parse(std::string input, tmpl& t) {
-    try {
-        parser p{std::move(input)};
-        block(p, t);
-    } catch (...) {
-        std::cout << std::endl;
-    }
+    parser<std::string::iterator> p{input.begin(), input.end()};
+    tmpl_context ctx;
+    block(p, t, ctx);
 }
 
 }
@@ -307,6 +407,14 @@ void parse(std::string input, tmpl& t) {
 int main() {
     ginger::tmpl t;
     t["xs"] = std::vector<int>{ 1, 2, 3, 4 };
+    t["value"] = 100;
+    t["x"] = true;
+    t["p"] = false;
+    t["q"] = false;
     std::string input = getStdin();
-    ginger::parse(input, t);
+    try {
+        ginger::parse(input, t);
+    } catch (int line) {
+        std::cerr << "error: " << line << std::endl;
+    }
 }

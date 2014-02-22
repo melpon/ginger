@@ -30,7 +30,8 @@
 
 $# <char> = any character without '$'
 $# <comment-char> = any character without '\n'
-$# <var> = any character without ' ' or '}'
+$# <whitespace> = c < 32 where c is character
+$# <var> = any character without <whitespace>, or '}'
 $# <block> = (<char> | <$comment> | <$for> | <$if> | <$variable> | $$ | ${{ | $}}) <block>
 $# <$comment> = $#<comment-char>*
 $# <$for> = $for <var> in <var> {{ <block> }}
