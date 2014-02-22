@@ -4,8 +4,11 @@
 <body>
   <p>${value}</p>
   $for x in xs {{ <p>${x}</p> }}
-  $if x {{
-    <section>${x}</section>
+  $for x in xs {{ $for y in xs {{
+    <p>${x},${y}</p>
+  }}}}
+  $if value {{
+    <section>${value}</section>
   }}
   $if p {{
     <p>p</p>
@@ -13,6 +16,11 @@
     <p>q</p>
   }} $else {{
     <p>else</p>
+  }}
+  $if p {{
+    hoge-
+  }} $for x in xs {{
+    fuga-
   }}
 
   $#escaped output '<p>${value}</p>'
@@ -30,7 +38,7 @@
 
 $# <char> = any character without '$'
 $# <comment-char> = any character without '\n'
-$# <whitespace> = c < 32 where c is character
+$# <whitespace> = c <= 32 where c is character
 $# <var> = any character without <whitespace>, or '}'
 $# <block> = (<char> | <$comment> | <$for> | <$if> | <$variable> | $$ | ${{ | $}}) <block>
 $# <$comment> = $#<comment-char>*
