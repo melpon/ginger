@@ -15,36 +15,6 @@ std::string getStdin() {
     return output;
 }
 
-template<class T>
-struct is_contextual_convertible_to_bool {
-    template<class U, int = sizeof(static_cast<bool>(std::declval<U>()))>
-    static constexpr auto test(int) -> char;
-    template<class>
-    static constexpr auto test(...) -> char(&)[2];
-
-    static constexpr bool value = sizeof(test<T>(0)) == 1;
-};
-
-template<class T>
-struct is_range {
-    template<class U, std::size_t = sizeof(std::declval<U>().begin(), std::declval<U>().end())>
-    static constexpr auto test(int) -> char;
-    template<class>
-    static constexpr auto test(...) -> char(&)[2];
-
-    static constexpr bool value = sizeof(test<T>(0)) == 1;
-};
-
-template<class T>
-struct has_str {
-    template<class U, int = sizeof(std::to_string(std::declval<U>()))>
-    static constexpr auto test(int) -> char;
-    template<class>
-    static constexpr auto test(...) -> char(&)[2];
-
-    static constexpr bool value = sizeof(test<T>(0)) == 1;
-};
-
 class object;
 class iterator {
     struct holder;
@@ -63,8 +33,8 @@ class object {
     struct holder {
         virtual ~holder() { }
         virtual bool cond() const = 0;
-        virtual iterator begin() = 0;
-        virtual iterator end() = 0;
+        virtual iterator xbegin() = 0;
+        virtual iterator xend() = 0;
         virtual std::string str() const = 0;
     };
 
@@ -73,8 +43,8 @@ class object {
         T obj;
         holder_impl(T obj) : obj(std::move(obj)) { }
 
-        template<class U>
-        bool cond_(int, typename std::enable_if<is_contextual_convertible_to_bool<U>::value>::type* = 0) const {
+        template<class U, int = sizeof(std::declval<U>() ? true : false)>
+        bool cond_(int) const {
             return static_cast<bool>(obj);
         }
         template<class>
@@ -85,32 +55,48 @@ class object {
             return cond_<T>(0);
         }
 
-        template<class U>
-        iterator begin_(int, typename std::enable_if<is_range<U>::value>::type* = 0) {
+        template<class U, std::size_t = sizeof(std::declval<U>().begin(), std::declval<U>().end())>
+        iterator begin_(short) {
             return obj.begin();
+        }
+        template<class U, std::size_t = sizeof(begin(std::declval<U>()), end(std::declval<U>()))>
+        iterator begin_(int) {
+            return begin(obj);
+        }
+        template<class U, std::size_t = sizeof(std::begin(std::declval<U>()), std::end(std::declval<U>()))>
+        iterator begin_(long) {
+            return std::begin(obj);
         }
         template<class>
         iterator begin_(...) {
             throw 0;
         }
-        virtual iterator begin() override {
+        virtual iterator xbegin() override {
             return begin_<T>(0);
         };
 
-        template<class U>
-        iterator end_(int, typename std::enable_if<is_range<U>::value>::type* = 0) {
+        template<class U, std::size_t = sizeof(std::declval<U>().begin(), std::declval<U>().end())>
+        iterator end_(short) {
             return obj.end();
+        }
+        template<class U, std::size_t = sizeof(begin(std::declval<U>()), end(std::declval<U>()))>
+        iterator end_(int) {
+            return end(obj);
+        }
+        template<class U, std::size_t = sizeof(std::begin(std::declval<U>()), std::end(std::declval<U>()))>
+        iterator end_(long) {
+            return std::end(obj);
         }
         template<class>
         iterator end_(...) {
             throw 0;
         }
-        virtual iterator end() override {
+        virtual iterator xend() override {
             return end_<T>(0);
         }
 
-        template<class U>
-        std::string str_(int, typename std::enable_if<has_str<U>::value>::type* = 0) const {
+        template<class U, int = sizeof(std::to_string(std::declval<U>()))>
+        std::string str_(int) const {
             return std::to_string(obj);
         }
         template<class>
@@ -138,10 +124,17 @@ public:
     void operator=(T v) { holder_.reset(new holder_impl<T>(std::move(v))); }
 
     explicit operator bool() const { return holder_->cond(); }
-    iterator begin() { return holder_->begin(); }
-    iterator end() { return holder_->end(); }
+    iterator xbegin() { return holder_->xbegin(); }
+    iterator xend() { return holder_->xend(); }
     std::string str() const { return holder_->str(); }
 };
+
+iterator begin(object& obj) {
+    return obj.xbegin();
+}
+iterator end(object& obj) {
+    return obj.xend();
+}
 
 struct iterator::holder {
     virtual ~holder() { }
