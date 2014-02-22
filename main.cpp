@@ -15,6 +15,8 @@ std::string getStdin() {
     return output;
 }
 
+namespace ginger {
+
 class object;
 class iterator {
     struct holder;
@@ -59,14 +61,6 @@ class object {
         iterator begin_(short) {
             return obj.begin();
         }
-        template<class U, std::size_t = sizeof(begin(std::declval<U>()), end(std::declval<U>()))>
-        iterator begin_(int) {
-            return begin(obj);
-        }
-        template<class U, std::size_t = sizeof(std::begin(std::declval<U>()), std::end(std::declval<U>()))>
-        iterator begin_(long) {
-            return std::begin(obj);
-        }
         template<class>
         iterator begin_(...) {
             throw 0;
@@ -78,14 +72,6 @@ class object {
         template<class U, std::size_t = sizeof(std::declval<U>().begin(), std::declval<U>().end())>
         iterator end_(short) {
             return obj.end();
-        }
-        template<class U, std::size_t = sizeof(begin(std::declval<U>()), end(std::declval<U>()))>
-        iterator end_(int) {
-            return end(obj);
-        }
-        template<class U, std::size_t = sizeof(std::begin(std::declval<U>()), std::end(std::declval<U>()))>
-        iterator end_(long) {
-            return std::end(obj);
         }
         template<class>
         iterator end_(...) {
@@ -191,9 +177,13 @@ public:
     }
 };
 
-void block(parser& p) {
+void block(parser& p, tmpl& dic) {
     char c = p.peek();
-    if (c != '$') {
+    if (c == '}' && p.next() == '}') {
+        p.read();
+        p.read();
+        return;
+    } else if (c != '$') {
         std::cout << c;
         p.read();
     } else {
@@ -239,34 +229,84 @@ void block(parser& p) {
                 d = p.peek();
             } while (d != ' ');
             if (name == "for") {
-                std::cout << "$for block";
+                while (p.peek() == ' ') p.read();
+                std::string var1;
+                while (p.peek() != ' ') {
+                    var1.push_back(p.peek());
+                    p.read();
+                }
+                while (p.peek() == ' ') p.read();
+                while (p.peek() != ' ') p.read();
+                while (p.peek() == ' ') p.read();
+                std::string var2;
+                while (p.peek() != ' ') {
+                    var2.push_back(p.peek());
+                    p.read();
+                }
+                while (p.peek() == ' ') p.read();
+                while (p.peek() == '{') p.read();
+                auto index = p.index;
+                auto index2 = -1;
+                for (object v: dic[var2]) {
+                    block(p, dic);
+                    index2 = p.index;
+                    p.index = index;
+                }
+                if (index2 == -1) {
+                    while (p.peek() != '}' || p.next() != '}')
+                        p.read();
+                    p.read();
+                    p.read();
+                } else {
+                    p.index = index2;
+                }
             } else if (name == "if") {
                 std::cout << "$if block";
+                while (p.peek() == ' ') p.read();
+                std::string var1;
+                while (p.peek() != ' ') {
+                    var1.push_back(p.peek());
+                    p.read();
+                }
+                while (p.peek() == ' ') p.read();
+                while (p.peek() == '{') p.read();
+                block(p, dic);
             } else if (name == "elseif") {
                 std::cout << "$elseif block";
+                while (p.peek() == ' ') p.read();
+                std::string var1;
+                while (p.peek() != ' ') {
+                    var1.push_back(p.peek());
+                    p.read();
+                }
+                while (p.peek() == ' ') p.read();
+                while (p.peek() == '{') p.read();
+                block(p, dic);
             } else if (name == "else") {
                 std::cout << "$else block";
+                while (p.peek() == ' ') p.read();
+                while (p.peek() == '{') p.read();
+                block(p, dic);
             }
         }
     }
-    block(p);
+    block(p, dic);
 }
 
-void parse(std::string input) {
+void parse(std::string input, tmpl& t) {
     try {
         parser p{std::move(input)};
-        block(p);
+        block(p, t);
     } catch (...) {
         std::cout << std::endl;
     }
 }
 
+}
+
 int main() {
-    tmpl t;
-    t["test"] = std::vector<int>{ 1, 2, 3, 4 };
-    for (object v: t["test"]) {
-        std::cout << v.str() << std::endl;
-    }
+    ginger::tmpl t;
+    t["xs"] = std::vector<int>{ 1, 2, 3, 4 };
     std::string input = getStdin();
-    parse(input);
+    ginger::parse(input, t);
 }
