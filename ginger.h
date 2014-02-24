@@ -230,10 +230,18 @@ public:
         if (current_ == last_)
             throw __LINE__;
         auto first = current_;
-        while (f(*current_))
+        while (f(peek()))
             read();
         return std::make_pair(first, current_);
     }
+    template<class F>
+    range_t read_while_or_eof(F f) {
+        auto first = current_;
+        while (current_ != last_ && f(*current_))
+            read();
+        return std::make_pair(first, current_);
+    }
+
     void skip_whitespace() {
         read_while([](char c) { return c <= 32; });
     }
@@ -267,30 +275,38 @@ public:
     }
 };
 
-template<class F>
-void output_string(F& out, const char* s) {
-    while (*s)
-        out(*s++);
+template<class F, std::size_t N>
+void output_string(F& out, const char (&s)[N]) {
+    out.put(s, s + N);
 }
 
 template<class Iterator, class F, class G>
 void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip, F& out, G& err) {
     while (p) {
-        char c = p.peek();
-        if (c == '}' && p.has_next() && p.next() == '}') {
-            // end of block
+        auto r = p.read_while_or_eof([](char c) { return c != '}' && c != '$'; });
+        if (not skip)
+            out.put(r.first, r.second);
+        if (!p)
             break;
-        } else if (c != '$') {
-            // normal character
-            p.read();
-            if (not skip) out(c);
-        } else {
+
+        char c = p.peek();
+        if (c == '}') {
+            if (p.has_next() && p.next() == '}') {
+                // end of block
+                break;
+            } else {
+                p.read();
+                if (not skip)
+                    output_string(out, "}");
+            }
+        } else if (c == '$') {
             p.read();
             c = p.peek();
             if (c == '$') {
                 // $$
                 p.read();
-                if (not skip) out('$');
+                if (not skip)
+                    output_string(out, "$");
             } else if (c == '#') {
                 // $# comments
                 p.read_while([](char peek) {
@@ -302,7 +318,8 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip, F& ou
                 if (c == '{') {
                     // ${{
                     p.read();
-                    if (not skip) output_string(out, "{{");
+                    if (not skip)
+                        output_string(out, "{{");
                 } else {
                     // ${variable}
                     auto r = p.read_ident();
@@ -313,9 +330,11 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip, F& ou
                         std::string var = std::string(r.first, r.second);
                         auto it = ctx.find(var);
                         if (it != ctx.end() && not it->second.empty()) {
-                            output_string(out, it->second.back().str().c_str());
+                            const std::string& str = it->second.back().str();
+                            out.put(str.begin(), str.end());
                         } else {
-                            output_string(out, dic[var].str().c_str());
+                            const std::string& str = dic[var].str();
+                            out.put(str.begin(), str.end());
                         }
                     }
                 }
@@ -325,7 +344,8 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip, F& ou
                 if (c == '}') {
                     // $}}
                     p.read();
-                    if (not skip) output_string(out, "}}");
+                    if (not skip)
+                        output_string(out, "}}");
                 } else {
                     throw __LINE__;
                 }
@@ -391,6 +411,9 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip, F& ou
                     throw __LINE__;
                 }
             }
+        } else {
+            assert(false && "must not go through.");
+            throw __LINE__;
         }
     }
 }
@@ -427,6 +450,8 @@ static void parse(std::string input, temple& t, F out, G err) {
     internal::parser<std::string::iterator> p{input.begin(), input.end()};
     internal::tmpl_context ctx;
     internal::block(p, t, ctx, false, out, err);
+    out.flush();
+    err.flush();
 }
 template<class F>
 static void parse(std::string input, temple& t, F out) {
