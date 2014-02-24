@@ -267,8 +267,14 @@ public:
     }
 };
 
-template<class Iterator>
-void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip) {
+template<class F>
+void output_string(F& out, const char* s) {
+    while (*s)
+        out(*s++);
+}
+
+template<class Iterator, class F, class G>
+void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip, F& out, G& err) {
     while (p) {
         char c = p.peek();
         if (c == '}' && p.has_next() && p.next() == '}') {
@@ -277,14 +283,14 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip) {
         } else if (c != '$') {
             // normal character
             p.read();
-            if (not skip) std::cout << c;
+            if (not skip) out(c);
         } else {
             p.read();
             c = p.peek();
             if (c == '$') {
                 // $$
                 p.read();
-                if (not skip) std::cout << '$';
+                if (not skip) out('$');
             } else if (c == '#') {
                 // $# comments
                 p.read_while([](char peek) {
@@ -296,7 +302,7 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip) {
                 if (c == '{') {
                     // ${{
                     p.read();
-                    if (not skip) std::cout << "{{";
+                    if (not skip) output_string(out, "{{");
                 } else {
                     // ${variable}
                     auto r = p.read_ident();
@@ -307,9 +313,9 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip) {
                         std::string var = std::string(r.first, r.second);
                         auto it = ctx.find(var);
                         if (it != ctx.end() && not it->second.empty()) {
-                            std::cout << it->second.back().str();
+                            output_string(out, it->second.back().str().c_str());
                         } else {
-                            std::cout << dic[var].str();
+                            output_string(out, dic[var].str().c_str());
                         }
                     }
                 }
@@ -319,7 +325,7 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip) {
                 if (c == '}') {
                     // $}}
                     p.read();
-                    if (not skip) std::cout << "}}";
+                    if (not skip) output_string(out, "}}");
                 } else {
                     throw __LINE__;
                 }
@@ -337,11 +343,11 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip) {
                     auto& vec = ctx[var1];
                     for (object v: dic[var2]) {
                         vec.push_back(v);
-                        block(p, dic, ctx, skip);
+                        block(p, dic, ctx, skip, out, err);
                         vec.pop_back();
                         p.load(context);
                     }
-                    block(p, dic, ctx, true);
+                    block(p, dic, ctx, true, out, err);
                     p.eat("}}");
                 } else if (p.equal(command, "if")) {
                     // $if x {{ <block> }}
@@ -351,7 +357,7 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip) {
                     auto var = p.read_ident_str();
                     p.eat_with_whitespace("{{");
                     bool run = static_cast<bool>(dic[var]);
-                    block(p, dic, ctx, skip || run);
+                    block(p, dic, ctx, skip || run, out, err);
                     p.eat("}}");
                     while (true) {
                         auto context = p.save();
@@ -364,13 +370,13 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip) {
                                 auto var = p.read_ident_str();
                                 p.eat_with_whitespace("{{");
                                 bool run_ = static_cast<bool>(dic[var]);
-                                block(p, dic, ctx, skip || (not run && run_));
+                                block(p, dic, ctx, skip || (not run && run_), out, err);
                                 p.eat("}}");
                                 if (not run && run_)
                                     run = true;
                             } else if (p.equal(command, "else")) {
                                 p.eat_with_whitespace("{{");
-                                block(p, dic, ctx, skip || not run);
+                                block(p, dic, ctx, skip || not run, out, err);
                                 p.eat("}}");
                                 break;
                             } else {
@@ -389,12 +395,45 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip) {
     }
 }
 
+template<class IOS>
+struct ios_type {
+    IOS ios;
+    ios_type(IOS ios) : ios(std::forward<IOS>(ios)) { }
+
+    template<class Iterator>
+    void put(Iterator first, Iterator last) {
+        std::copy(first, last, std::ostreambuf_iterator<char>(ios));
+    }
+    void flush() {
+        ios << std::flush;
+    }
+
+    ios_type(ios_type&&) = default;
+    ios_type& operator=(ios_type&&) = default;
+
+    ios_type(const ios_type&) = delete;
+    ios_type& operator=(const ios_type&) = delete;
+};
+
 }
 
-void parse(std::string input, temple& t) {
+template<class IOS>
+internal::ios_type<IOS> from_ios(IOS&& ios) {
+    return internal::ios_type<IOS>(std::forward<IOS>(ios));
+}
+
+template<class F, class G>
+static void parse(std::string input, temple& t, F out, G err) {
     internal::parser<std::string::iterator> p{input.begin(), input.end()};
     internal::tmpl_context ctx;
-    block(p, t, ctx, false);
+    internal::block(p, t, ctx, false, out, err);
+}
+template<class F>
+static void parse(std::string input, temple& t, F out) {
+    parse(input, t, std::move(out), from_ios(std::cerr));
+}
+static void parse(std::string input, temple& t) {
+    parse(input, t, from_ios(std::cout), from_ios(std::cerr));
 }
 
 }
