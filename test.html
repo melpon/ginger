@@ -39,11 +39,12 @@
 $# <char> = any character without '$'
 $# <comment-char> = any character without '\n'
 $# <whitespace> = c <= 32 where c is character
-$# <var> = any character without <whitespace>, or '}'
+$# <var-char> = any character without <whitespace>, '.', or '}'
+$# <var-name> = <var-char>+
+$# <var> = <var-name>(.<var-name>)*
 $# <block> = (<char> | <$comment> | <$for> | <$if> | <$variable> | $$ | ${{ | $}}) <block>
 $# <$comment> = $#<comment-char>*
-$# <$for> = $for <var> in <var> {{ <block> }}
+$# <$for> = $for <var-name> in <var> {{ <block> }}
 $# <$if> = $if <var> {{ <block> }} ($elseif <var> {{ <block> }})? ($else {{ <block> }})?
 $# <$variable> = ${<var>}
 $# <root> = <block>
-

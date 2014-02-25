@@ -16,6 +16,17 @@ std::string getStdin() {
 
 int main() {
     ginger::temple t;
+    t["test"] = std::map<std::string, std::string>{
+        { "hoge", "fuga" },
+        { "moke", "piyo" },
+    };
+    try {
+        std::cout << t["test"]["hoge"].str() << std::endl;
+        std::cout << t["test"]["moke"].str() << std::endl;
+    } catch (int line) {
+        std::cerr << "error: " << line << std::endl;
+    }
+
     t["xs"] = std::vector<int>{ 1, 2, 3, 4 };
     t["value"] = "hoge-";
     t["x"] = true;

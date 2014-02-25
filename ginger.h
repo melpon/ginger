@@ -32,6 +32,7 @@ class object {
         virtual iterator xbegin() = 0;
         virtual iterator xend() = 0;
         virtual std::string str() const = 0;
+        virtual object get(std::string name) = 0;
     };
 
     template<class T>
@@ -88,6 +89,18 @@ class object {
         virtual std::string str() const override {
             return str_<T>(0);
         }
+
+        template<class U, int = sizeof(std::declval<U>()[std::declval<std::string>()])>
+        object get_(int, std::string name) {
+            return obj[std::move(name)];
+        }
+        template<class U>
+        object get_(long, std::string, ...) {
+            throw __LINE__;
+        }
+        virtual object get(std::string name) override {
+            return get_<T>(0, std::move(name));
+        }
     };
 
     std::shared_ptr<holder> holder_;
@@ -109,6 +122,7 @@ public:
     iterator xbegin() { return holder_->xbegin(); }
     iterator xend() { return holder_->xend(); }
     std::string str() const { return holder_->str(); }
+    object operator[](std::string name) { return holder_->get(std::move(name)); }
 };
 
 iterator begin(object& obj) {
