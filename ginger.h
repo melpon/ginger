@@ -112,7 +112,11 @@ class object {
         Get fget_;
 
         holder_impl2(Cond cond, Begin begin, End end, Str str, Get get)
-            : fcond_(cond), fbegin_(begin), fend_(end), fstr_(str), fget_(get) { }
+            : fcond_(std::move(cond))
+            , fbegin_(std::move(begin))
+            , fend_(std::move(end))
+            , fstr_(std::move(str))
+            , fget_(std::move(get)) { }
 
         template<class U, int = sizeof(std::declval<U>()())>
         bool cond_(int) const {
