@@ -29,8 +29,8 @@ class object {
     struct holder {
         virtual ~holder() { }
         virtual bool cond() const = 0;
-        virtual iterator xbegin() = 0;
-        virtual iterator xend() = 0;
+        virtual iterator begin() = 0;
+        virtual iterator end() = 0;
         virtual std::string str() const = 0;
         virtual object get(std::string name) = 0;
     };
@@ -60,7 +60,7 @@ class object {
         iterator begin_(...) {
             throw __LINE__;
         }
-        virtual iterator xbegin() override {
+        virtual iterator begin() override {
             return begin_<T>(0);
         };
 
@@ -72,7 +72,7 @@ class object {
         iterator end_(...) {
             throw __LINE__;
         }
-        virtual iterator xend() override {
+        virtual iterator end() override {
             return end_<T>(0);
         }
 
@@ -127,15 +127,15 @@ class object {
         }
 
         template<class U, int = sizeof(std::declval<U>()())>
-        bool xbegin_(int) const {
+        bool begin_(int) const {
             return fbegin_();
         }
         template<class>
-        bool xbegin_(...) const {
+        bool begin_(...) const {
             throw __LINE__;
         }
-        virtual iterator xbegin() override {
-            return xbegin_<Begin>();
+        virtual iterator begin() override {
+            return begin_<Begin>();
         }
 
         template<class U, int = sizeof(std::declval<U>()())>
@@ -146,7 +146,7 @@ class object {
         bool xend_(...) const {
             throw __LINE__;
         }
-        virtual iterator xend() override {
+        virtual iterator end() override {
             return xend_<End>();
         }
 
@@ -191,8 +191,8 @@ public:
     void operator=(T v) { holder_.reset(new holder_impl<T>(std::move(v))); }
 
     explicit operator bool() const { return holder_->cond(); }
-    iterator xbegin() { return holder_->xbegin(); }
-    iterator xend() { return holder_->xend(); }
+    iterator begin() { return holder_->begin(); }
+    iterator end() { return holder_->end(); }
     std::string str() const { return holder_->str(); }
     object operator[](std::string name) { return holder_->get(std::move(name)); }
 
@@ -203,13 +203,6 @@ public:
         return obj;
     }
 };
-
-iterator begin(object& obj) {
-    return obj.xbegin();
-}
-iterator end(object& obj) {
-    return obj.xend();
-}
 
 struct iterator::holder {
     virtual ~holder() { }
