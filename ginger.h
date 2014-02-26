@@ -179,21 +179,6 @@ public:
     Iterator next_;
     Iterator last_;
 
-    void skip_(int n, std::forward_iterator_tag) {
-        while (n != 0) {
-            read();
-            --n;
-        }
-    }
-    void skip_(int n, std::random_access_iterator_tag) {
-        if (last_ - current_ < n)
-            throw __LINE__;
-        current_ += n;
-        next_ += n - 1;
-        if (next_ != last_)
-            ++next_;
-    }
-
 public:
     typedef std::pair<Iterator, Iterator> range_t;
 
@@ -202,9 +187,6 @@ public:
         current_ = next_++;
     }
 
-    void skip(int n) {
-        skip_(n, typename std::iterator_traits<Iterator>::iterator_category());
-    }
     void read() {
         if (current_ == last_)
             throw __LINE__;
@@ -267,6 +249,13 @@ public:
         auto r = read_ident();
         return std::string(r.first, r.second);
     }
+    range_t read_variable() {
+        return read_while([](char c) { return c > 32 && c != '.' && c != '}'; });
+    }
+    std::string read_variable_str() {
+        auto r = read_variable();
+        return std::string(r.first, r.second);
+    }
 
     void eat(char c) {
         if (peek() != c)
@@ -292,6 +281,39 @@ public:
 template<class F, std::size_t N>
 void output_string(F& out, const char (&s)[N]) {
     out.put(s, s + N);
+}
+
+template<class Iterator>
+object get_variable(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip) {
+    p.skip_whitespace();
+    if (skip) {
+        p.read_variable();
+        while (p.peek() == '.') {
+            p.read();
+            p.read_variable();
+        }
+        return object();
+    } else {
+        std::string var = p.read_variable_str();
+        auto it = ctx.find(var);
+        object obj;
+        if (it != ctx.end() && not it->second.empty()) {
+            obj = it->second.back();
+        } else {
+            auto it2 = dic.find(var);
+            if (it2 != dic.end()) {
+                obj = dic[var];
+            } else {
+                throw __LINE__;
+            }
+        }
+        while (p.peek() == '.') {
+            p.read();
+            std::string var = p.read_variable_str();
+            obj = obj[var];
+        }
+        return obj;
+    }
 }
 
 template<class Iterator, class F, class G>
@@ -323,7 +345,7 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip, F& ou
                     output_string(out, "$");
             } else if (c == '#') {
                 // $# comments
-                p.read_while([](char peek) {
+                p.read_while_or_eof([](char peek) {
                     return peek != '\n';
                 });
             } else if (c == '{') {
@@ -336,20 +358,12 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip, F& ou
                         output_string(out, "{{");
                 } else {
                     // ${variable}
-                    auto r = p.read_ident();
-                    p.skip_whitespace();
-                    p.eat('}');
+                    object obj = get_variable(p, dic, ctx, skip);
+                    p.eat_with_whitespace("}");
 
                     if (not skip) {
-                        std::string var = std::string(r.first, r.second);
-                        auto it = ctx.find(var);
-                        if (it != ctx.end() && not it->second.empty()) {
-                            const std::string& str = it->second.back().str();
-                            out.put(str.begin(), str.end());
-                        } else {
-                            const std::string& str = dic[var].str();
-                            out.put(str.begin(), str.end());
-                        }
+                        std::string str = obj.str();
+                        out.put(str.begin(), str.end());
                     }
                 }
             } else if (c == '}') {
@@ -370,28 +384,37 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip, F& ou
                     auto var1 = p.read_ident_str();
                     if (not p.equal(p.read_ident(), "in"))
                         throw __LINE__;
-                    auto var2 = p.read_ident_str();
+                    object obj = get_variable(p, dic, ctx, skip);
                     p.eat_with_whitespace("{{");
 
-                    auto context = p.save();
-                    auto& vec = ctx[var1];
-                    for (object v: dic[var2]) {
-                        vec.push_back(v);
-                        block(p, dic, ctx, skip, out, err);
-                        vec.pop_back();
-                        p.load(context);
+                    if (skip) {
+                        block(p, dic, ctx, true, out, err);
+                    } else {
+                        auto context = p.save();
+                        auto& vec = ctx[var1];
+                        for (object v: obj) {
+                            vec.push_back(v);
+                            block(p, dic, ctx, skip, out, err);
+                            vec.pop_back();
+                            p.load(context);
+                        }
+                        block(p, dic, ctx, true, out, err);
                     }
-                    block(p, dic, ctx, true, out, err);
                     p.eat("}}");
                 } else if (p.equal(command, "if")) {
                     // $if x {{ <block> }}
                     // $elseif y {{ <block> }}
                     // $elseif z {{ <block> }}
                     // $else {{ <block> }}
-                    auto var = p.read_ident_str();
+                    object obj = get_variable(p, dic, ctx, skip);
                     p.eat_with_whitespace("{{");
-                    bool run = static_cast<bool>(dic[var]);
-                    block(p, dic, ctx, skip || run, out, err);
+                    bool run; // if `skip` is true, `run` is an unspecified value.
+                    if (skip) {
+                        block(p, dic, ctx, true, out, err);
+                    } else {
+                        run = static_cast<bool>(obj);
+                        block(p, dic, ctx, not run, out, err);
+                    }
                     p.eat("}}");
                     while (true) {
                         auto context = p.save();
@@ -401,13 +424,17 @@ void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip, F& ou
                             p.read();
                             auto command = p.read_ident();
                             if (p.equal(command, "elseif")) {
-                                auto var = p.read_ident_str();
+                                object obj = get_variable(p, dic, ctx, skip);
                                 p.eat_with_whitespace("{{");
-                                bool run_ = static_cast<bool>(dic[var]);
-                                block(p, dic, ctx, skip || (not run && run_), out, err);
+                                if (skip || run) {
+                                    block(p, dic, ctx, true, out, err);
+                                } else {
+                                    bool run_ = static_cast<bool>(obj);
+                                    block(p, dic, ctx, not run_, out, err);
+                                    if (run_)
+                                        run = true;
+                                }
                                 p.eat("}}");
-                                if (not run && run_)
-                                    run = true;
                             } else if (p.equal(command, "else")) {
                                 p.eat_with_whitespace("{{");
                                 block(p, dic, ctx, skip || not run, out, err);

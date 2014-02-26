@@ -33,6 +33,12 @@
       $}}
     </pre>
   }}
+  $for y in ys.values {{
+    $if y.test {{
+      <p>${y.fuga}</p>
+      <p>${y.moke}</p>
+    }}
+  }}
 </body>
 </html>
 
