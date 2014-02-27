@@ -254,11 +254,13 @@ public:
     Iterator current_;
     Iterator next_;
     Iterator last_;
+    std::string line_;
+    int line_number_;
 
 public:
     typedef std::pair<Iterator, Iterator> range_t;
 
-    parser(Iterator first, Iterator last) : next_(first), last_(last) {
+    parser(Iterator first, Iterator last) : next_(first), last_(last), line_number_(1) {
         assert(first != last);
         current_ = next_++;
     }
@@ -266,9 +268,22 @@ public:
     void read() {
         if (current_ == last_)
             throw __LINE__;
+        if (*current_ == '\n') {
+            line_.clear();
+            ++line_number_;
+        } else {
+            line_.push_back(*current_);
+        }
         current_ = next_;
         if (next_ != last_)
             ++next_;
+    }
+    std::string read_error() {
+        while (current_ != last_ && *current_ != '\n')
+            line_.push_back(*current_++);
+        std::stringstream ss;
+        ss << "line " << line_number_ << ": " << line_ << std::endl;
+        return ss.str();
     }
 
     explicit operator bool() const {
@@ -288,13 +303,16 @@ public:
         return *next_;
     }
 
-    Iterator save() const {
-        return current_;
+    typedef std::tuple<Iterator, std::string, int> context_t;
+    context_t save() const {
+        return std::make_tuple(current_, line_, line_number_);
     }
-    void load(Iterator context) {
-        current_ = next_ = context;
+    void load(context_t context) {
+        current_ = next_ = std::get<0>(context);
         if (next_ != last_)
             ++next_;
+        line_ = std::get<1>(context);
+        line_number_ = std::get<2>(context);
     }
 
     template<class F>
@@ -566,7 +584,12 @@ template<class F, class G>
 static void parse(std::string input, temple& t, F out, G err) {
     internal::parser<std::string::iterator> p{input.begin(), input.end()};
     internal::tmpl_context ctx;
-    internal::block(p, t, ctx, false, out, err);
+    try {
+        internal::block(p, t, ctx, false, out, err);
+    } catch (int) {
+        auto error = p.read_error();
+        err.put(error.begin(), error.end());
+    }
     out.flush();
     err.flush();
 }
