@@ -374,11 +374,11 @@ public:
 
 template<class F, std::size_t N>
 void output_string(F& out, const char (&s)[N]) {
-    out.put(s, s + N);
+    out.put(s, s + N - 1);
 }
 
 template<class Iterator>
-object get_variable(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip) {
+object get_variable(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, bool skip) {
     p.skip_whitespace();
     if (skip) {
         p.read_variable();
@@ -396,7 +396,7 @@ object get_variable(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool sk
         } else {
             auto it2 = dic.find(var);
             if (it2 != dic.end()) {
-                obj = dic[var];
+                obj = it2->second;
             } else {
                 throw __LINE__;
             }
@@ -411,7 +411,7 @@ object get_variable(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool sk
 }
 
 template<class Iterator, class F, class G>
-void block(parser<Iterator>& p, temple& dic, tmpl_context& ctx, bool skip, F& out, G& err) {
+void block(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, bool skip, F& out, G& err) {
     while (p) {
         auto r = p.read_while_or_eof([](char c) { return c != '}' && c != '$'; });
         if (not skip)
@@ -581,7 +581,7 @@ internal::ios_type<IOS> from_ios(IOS&& ios) {
 }
 
 template<class F, class G>
-static void parse(std::string input, temple& t, F out, G err) {
+static void parse(std::string input, const temple& t, F out, G err) {
     internal::parser<std::string::iterator> p{input.begin(), input.end()};
     internal::tmpl_context ctx;
     try {
@@ -594,10 +594,10 @@ static void parse(std::string input, temple& t, F out, G err) {
     err.flush();
 }
 template<class F>
-static void parse(std::string input, temple& t, F out) {
+static void parse(std::string input, const temple& t, F out) {
     parse(input, t, std::move(out), from_ios(std::cerr));
 }
-static void parse(std::string input, temple& t) {
+static void parse(std::string input, const temple& t) {
     parse(input, t, from_ios(std::cout), from_ios(std::cerr));
 }
 
