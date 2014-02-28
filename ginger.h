@@ -245,6 +245,27 @@ bool iterator::operator!=(iterator it) const {
 
 typedef std::map<std::string, object> temple;
 
+class parse_error : public std::exception {
+    int line_number_;
+    std::string line1_;
+    std::string line2_;
+    std::string line_;
+
+public:
+    parse_error(int line_number, std::string line1, std::string line2)
+        : line_number_(line_number)
+        , line1_(line1)
+        , line2_(line2) {
+        std::stringstream ss;
+        ss << "line " << line_number_ << ": " << line1_ << line2_ << std::endl;
+        line_ = ss.str();
+    }
+    virtual const char* what() const noexcept { return line_.c_str(); }
+    int line_number() const noexcept { return line_number_; }
+    const std::string& line1() const noexcept { return line1_; }
+    const std::string& line2() const noexcept { return line2_; }
+};
+
 namespace internal {
 
 typedef std::map<std::string, std::vector<object>> tmpl_context;
@@ -279,13 +300,11 @@ public:
         if (next_ != last_)
             ++next_;
     }
-    std::string read_error() {
+    parse_error read_error() {
         std::string line;
         while (current_ != last_ && *current_ != '\n')
             line.push_back(*current_++);
-        std::stringstream ss;
-        ss << "line " << line_number_ << ": [" << line_ << "][" << line << "]" << std::endl;
-        return ss.str();
+        return parse_error(line_number_, line_, line);
     }
 
     explicit operator bool() const {
@@ -349,7 +368,10 @@ public:
         return std::string(r.first, r.second);
     }
     range_t read_variable() {
-        return read_while([](char c) { return c > 32 && c != '.' && c != '{' && c != '}'; });
+        auto r = read_while([](char c) { return c > 32 && c != '.' && c != '{' && c != '}'; });
+        if (r.first == r.second)
+            throw __LINE__;
+        return r;
     }
     std::string read_variable_str() {
         auto r = read_variable();
@@ -590,16 +612,6 @@ internal::ios_type<IOS> from_ios(IOS&& ios) {
     return internal::ios_type<IOS>(std::forward<IOS>(ios));
 }
 
-class parse_error : public std::exception {
-    std::string str;
-
-public:
-    //parse_error() = default;
-    //parse_error(const parse_error&) = default;
-    parse_error(std::string str) : str(str) { }
-    virtual const char* what() const noexcept { return str.c_str(); }
-};
-
 template<class F>
 static void parse(std::string input, const temple& t, F out) {
     internal::parser<std::string::iterator> p{input.begin(), input.end()};
@@ -607,7 +619,7 @@ static void parse(std::string input, const temple& t, F out) {
     try {
         internal::block(p, t, ctx, false, out);
     } catch (int) {
-        throw parse_error(p.read_error());
+        throw p.read_error();
     }
     out.flush();
 }
