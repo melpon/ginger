@@ -337,14 +337,14 @@ public:
     }
     range_t read_ident() {
         skip_whitespace();
-        return read_while([](char c) { return c > 32 && c != '}'; });
+        return read_while([](char c) { return c > 32 && c != '{' && c != '}'; });
     }
     std::string read_ident_str() {
         auto r = read_ident();
         return std::string(r.first, r.second);
     }
     range_t read_variable() {
-        return read_while([](char c) { return c > 32 && c != '.' && c != '}'; });
+        return read_while([](char c) { return c > 32 && c != '.' && c != '{' && c != '}'; });
     }
     std::string read_variable_str() {
         auto r = read_variable();
@@ -531,7 +531,7 @@ void block(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, bool skip,
                                 p.eat("}}");
                             } else if (p.equal(command, "else")) {
                                 p.eat_with_whitespace("{{");
-                                block(p, dic, ctx, skip || not run, out, err);
+                                block(p, dic, ctx, skip || run, out, err);
                                 p.eat("}}");
                                 break;
                             } else {

@@ -14,12 +14,22 @@ std::string getStdin() {
     return output;
 }
 
+int failed = 0;
+
 void print_error(int line, std::string input, std::string expected, std::string actual, std::string error = "") {
     std::cerr << "------------- TEST ERROR (" << line << ") ---------------" << std::endl;
+    /*
+    for (auto c: expected)
+        std::cout << (int)c << std::endl;
+    std::cout << "---" << std::endl;
+    for (auto c: actual)
+        std::cout << (int)c << std::endl;
+    */
     std::cerr << "input: " << input << std::endl;
     std::cerr << "expected: " << expected << std::endl;
     std::cerr << "actual: " << actual << std::endl;
     std::cerr << "error: " <<  error << std::endl;
+    ++failed;
 }
 void test_eq(std::string input, std::string expected, ginger::temple* p, int line) {
     try {
@@ -42,8 +52,62 @@ void test_eq(std::string input, std::string expected, ginger::temple* p, int lin
 
 int main() {
     TEST_EQ("Hello", "Hello");
-    TEST_EQ("${", "{");
     TEST_EQ("${{", "{{");
+    TEST_EQ("$}}", "}}");
+    TEST_EQ("$$", "$");
+    TEST_EQ("$# comment", "");
+    TEST_EQ("$# comment\n", "\n");
+    // test ${variable}
+    {
+        ginger::temple t;
+        t["value"] = 100;
+        t["map"] = std::map<std::string, int>{ { "hoge", 1 }, { "fuga", 2 } };
+        TEST_EQ_T("${value}", "100", t);
+        TEST_EQ_T("${map.hoge}, ${map.fuga}", "1, 2", t);
+    }
+    // test $for
+    {
+        ginger::temple t;
+        t["xs"] = std::vector<int>{ 1, 2 };
+        t["ys"] = std::map<std::string, std::vector<int>>{ { "hoge", { 1, 2, 3 } } };
+        TEST_EQ_T("$for x in xs{{test}}", "testtest", t);
+        TEST_EQ_T("$for x in xs {{ test }}", " test  test ", t);
+        TEST_EQ_T("$for x in xs{{$for x in xs{{test}}}}", "testtesttesttest", t);
+        TEST_EQ_T("$for y in ys.hoge{{${y}}}", "123", t);
+        TEST_EQ_T("$for y in  \t  ys.hoge   {{${y}\n}}", "1\n2\n3\n", t);
+    }
+    // test $if
+    {
+        ginger::temple t;
+        t["true"] = true;
+        t["false"] = false;
+
+        // $if
+        TEST_EQ_T("$if true {{hoge}}", "hoge", t);
+        TEST_EQ_T("$if false{{hoge}}", "", t);
+
+        // $elseif
+        TEST_EQ_T("$if true{{hoge}}$elseif true{{fuga}}", "hoge", t);
+        TEST_EQ_T("$if true{{hoge}}$elseif undefined{{${undefined}}}", "hoge", t);
+        TEST_EQ_T("$if false{{hoge}}$elseif true{{fuga}}", "fuga", t);
+        TEST_EQ_T("$if false{{hoge}}$elseif true{{fuga}} $elseif undefined {{ fuga2 }}", "fuga", t);
+        TEST_EQ_T("$if false{{hoge}}$elseif false{{fuga}} $elseif true {{ fuga2 }}", " fuga2 ", t);
+
+        // $else
+        TEST_EQ_T("$if true {{hoge}}$else{{moke}}", "hoge", t);
+        TEST_EQ_T("$if true {{hoge}} $else {{${undefined}}}", "hoge", t);
+        TEST_EQ_T("$if false {{hoge}} $elseif true {{fuga}} $else{{moke}}", "fuga", t);
+        TEST_EQ_T("$if false {{hoge}} $elseif false {{fuga}} $else{{moke}}", "moke", t);
+
+        // confusing case
+        TEST_EQ_T("$if true {{hoge}} ${true}", "hoge 1", t);
+        TEST_EQ_T("$if true {{hoge}}${{", "hoge{{", t);
+    }
+    if (failed != 0) {
+        std::cerr << "------- TEST FAILED --------" << std::endl;
+        std::cerr << "FAILED COUNT: " << failed << std::endl;
+        std::exit(1);
+    }
 
     /*
     ginger::temple t;
