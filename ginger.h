@@ -2,6 +2,7 @@
 #define GINGER_H_INCLUDED
 
 #include <iostream>
+#include <exception>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -279,10 +280,11 @@ public:
             ++next_;
     }
     std::string read_error() {
+        std::string line;
         while (current_ != last_ && *current_ != '\n')
-            line_.push_back(*current_++);
+            line.push_back(*current_++);
         std::stringstream ss;
-        ss << "line " << line_number_ << ": " << line_ << std::endl;
+        ss << "line " << line_number_ << ": [" << line_ << "][" << line << "]" << std::endl;
         return ss.str();
     }
 
@@ -334,6 +336,9 @@ public:
 
     void skip_whitespace() {
         read_while([](char c) { return c <= 32; });
+    }
+    void skip_whitespace_or_eof() {
+        read_while_or_eof([](char c) { return c <= 32; });
     }
     range_t read_ident() {
         skip_whitespace();
@@ -410,8 +415,8 @@ object get_variable(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, b
     }
 }
 
-template<class Iterator, class F, class G>
-void block(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, bool skip, F& out, G& err) {
+template<class Iterator, class F>
+void block(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, bool skip, F& out) {
     while (p) {
         auto r = p.read_while_or_eof([](char c) { return c != '}' && c != '$'; });
         if (not skip)
@@ -482,17 +487,17 @@ void block(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, bool skip,
                     p.eat_with_whitespace("{{");
 
                     if (skip) {
-                        block(p, dic, ctx, true, out, err);
+                        block(p, dic, ctx, true, out);
                     } else {
                         auto context = p.save();
                         auto& vec = ctx[var1];
                         for (object v: obj) {
                             vec.push_back(v);
-                            block(p, dic, ctx, skip, out, err);
+                            block(p, dic, ctx, skip, out);
                             vec.pop_back();
                             p.load(context);
                         }
-                        block(p, dic, ctx, true, out, err);
+                        block(p, dic, ctx, true, out);
                     }
                     p.eat("}}");
                 } else if (p.equal(command, "if")) {
@@ -504,34 +509,38 @@ void block(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, bool skip,
                     p.eat_with_whitespace("{{");
                     bool run; // if `skip` is true, `run` is an unspecified value.
                     if (skip) {
-                        block(p, dic, ctx, true, out, err);
+                        block(p, dic, ctx, true, out);
                     } else {
                         run = static_cast<bool>(obj);
-                        block(p, dic, ctx, not run, out, err);
+                        block(p, dic, ctx, not run, out);
                     }
                     p.eat("}}");
                     while (true) {
                         auto context = p.save();
-                        p.skip_whitespace();
+                        p.skip_whitespace_or_eof();
+                        if (!p) {
+                            p.load(context);
+                            break;
+                        }
                         c = p.peek();
                         if (c == '$') {
                             p.read();
                             auto command = p.read_ident();
                             if (p.equal(command, "elseif")) {
-                                object obj = get_variable(p, dic, ctx, skip);
+                                object obj = get_variable(p, dic, ctx, skip || run);
                                 p.eat_with_whitespace("{{");
                                 if (skip || run) {
-                                    block(p, dic, ctx, true, out, err);
+                                    block(p, dic, ctx, true, out);
                                 } else {
                                     bool run_ = static_cast<bool>(obj);
-                                    block(p, dic, ctx, not run_, out, err);
+                                    block(p, dic, ctx, not run_, out);
                                     if (run_)
                                         run = true;
                                 }
                                 p.eat("}}");
                             } else if (p.equal(command, "else")) {
                                 p.eat_with_whitespace("{{");
-                                block(p, dic, ctx, skip || run, out, err);
+                                block(p, dic, ctx, skip || run, out);
                                 p.eat("}}");
                                 break;
                             } else {
@@ -539,6 +548,7 @@ void block(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, bool skip,
                                 break;
                             }
                         } else {
+                            p.load(context);
                             break;
                         }
                     }
@@ -580,25 +590,29 @@ internal::ios_type<IOS> from_ios(IOS&& ios) {
     return internal::ios_type<IOS>(std::forward<IOS>(ios));
 }
 
-template<class F, class G>
-static void parse(std::string input, const temple& t, F out, G err) {
+class parse_error : public std::exception {
+    std::string str;
+
+public:
+    //parse_error() = default;
+    //parse_error(const parse_error&) = default;
+    parse_error(std::string str) : str(str) { }
+    virtual const char* what() const noexcept { return str.c_str(); }
+};
+
+template<class F>
+static void parse(std::string input, const temple& t, F out) {
     internal::parser<std::string::iterator> p{input.begin(), input.end()};
     internal::tmpl_context ctx;
     try {
-        internal::block(p, t, ctx, false, out, err);
+        internal::block(p, t, ctx, false, out);
     } catch (int) {
-        auto error = p.read_error();
-        err.put(error.begin(), error.end());
+        throw parse_error(p.read_error());
     }
     out.flush();
-    err.flush();
-}
-template<class F>
-static void parse(std::string input, const temple& t, F out) {
-    parse(input, t, std::move(out), from_ios(std::cerr));
 }
 static void parse(std::string input, const temple& t) {
-    parse(input, t, from_ios(std::cout), from_ios(std::cerr));
+    parse(input, t, from_ios(std::cout));
 }
 
 }

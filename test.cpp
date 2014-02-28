@@ -34,17 +34,15 @@ void print_error(int line, std::string input, std::string expected, std::string 
 void test_eq(std::string input, std::string expected, ginger::temple* p, int line) {
     try {
         std::stringstream ss;
-        std::stringstream ess;
-        ginger::parse(input, p ? *p : ginger::temple(), ginger::from_ios(ss), ginger::from_ios(ess));
+        ginger::parse(input, p ? *p : ginger::temple(), ginger::from_ios(ss));
         auto actual = ss.str();
         if (actual != expected) {
-            auto error = ess.str();
-            print_error(line, input, expected, actual, error);
+            print_error(line, input, expected, actual, "");
         }
-    } catch (int gline) {
-        print_error(line, input, expected, "EXCEPTION (" + std::to_string(gline) + ")");
+    } catch (ginger::parse_error& error) {
+        print_error(line, input, expected, "PARSE ERROR", error.what());
     } catch (...) {
-        print_error(line, input, expected, "UNKNOWN EXCEPTION");
+        print_error(line, input, expected, "UNKNOWN EXCEPTION", "");
     }
 }
 #define TEST_EQ(input, expected) test_eq(input, expected, nullptr, __LINE__)
@@ -102,6 +100,8 @@ int main() {
         // confusing case
         TEST_EQ_T("$if true {{hoge}} ${true}", "hoge 1", t);
         TEST_EQ_T("$if true {{hoge}}${{", "hoge{{", t);
+        TEST_EQ_T("$if true {{hoge}}  ", "hoge  ", t);
+        TEST_EQ_T("$if true {{hoge}}  a", "hoge  a", t);
     }
     if (failed != 0) {
         std::cerr << "------- TEST FAILED --------" << std::endl;
