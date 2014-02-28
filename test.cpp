@@ -82,7 +82,9 @@ int main() {
         t["map"] = std::map<std::string, int>{ { "hoge", 1 }, { "fuga", 2 } };
         TEST_EQ_T("${value}", "100", t);
         TEST_EQ_T("${map.hoge}, ${map.fuga}", "1, 2", t);
-        TEST_EXC_T("${map.}", t);
+        TEST_EQ_T("${  map.hoge  }, ${  map.fuga  }", "1, 2", t);
+        TEST_EXC_T("${ map. hoge }", t);
+        TEST_EXC_T("${ map .hoge }", t);
         TEST_EXC_T("${undefined}", t);
     }
     // test $for
