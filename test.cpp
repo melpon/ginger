@@ -3,6 +3,7 @@
 #include <ios>
 #include <vector>
 #include <string>
+#include <list>
 
 std::string getStdin() {
     std::string output;
@@ -16,7 +17,8 @@ std::string getStdin() {
 
 int failed = 0;
 
-void print_error(int line, std::string input, std::string expected, std::string actual, std::string error = "") {
+template<class Input>
+void print_error(int line, Input input, std::string expected, std::string actual, std::string error = "") {
     std::cerr << "------------- TEST ERROR (" << line << ") ---------------" << std::endl;
     /*
     for (auto c: expected)
@@ -25,13 +27,18 @@ void print_error(int line, std::string input, std::string expected, std::string 
     for (auto c: actual)
         std::cout << (int)c << std::endl;
     */
-    std::cerr << "input: " << input << std::endl;
+    std::cerr << "input: " << std::string(std::begin(input), std::end(input)) << std::endl;
     std::cerr << "expected: " << expected << std::endl;
     std::cerr << "actual: " << actual << std::endl;
     std::cerr << "error: " <<  error << std::endl;
     ++failed;
 }
-void test_eq(std::string input, std::string expected, ginger::temple* p, int line) {
+void print_error(int line, const char* input, std::string expected, std::string actual, std::string error = "") {
+    print_error(line, std::string(input), expected, actual, error);
+}
+
+template<class Input>
+void test_eq(Input input, std::string expected, ginger::temple* p, int line) {
     try {
         std::stringstream ss;
         ginger::parse(input, p ? *p : ginger::temple(), ginger::from_ios(ss));
@@ -47,7 +54,8 @@ void test_eq(std::string input, std::string expected, ginger::temple* p, int lin
         print_error(line, input, expected, "UNKNOWN EXCEPTION", "");
     }
 }
-void test_exc(std::string input, ginger::temple* p, int line) {
+template<class Input>
+void test_exc(Input input, ginger::temple* p, int line) {
     try {
         std::stringstream ss;
         ginger::parse(input, p ? *p : ginger::temple(), ginger::from_ios(ss));
@@ -137,6 +145,16 @@ int main() {
         TEST_EQ_T("$if true {{hoge}}  ", "hoge  ", t);
         TEST_EQ_T("$if true {{hoge}}  a", "hoge  a", t);
         TEST_EXC_T("$if true {{hoge}} $", t);
+    }
+    // test ForwardIterator
+    {
+        ginger::temple t;
+        t["true"] = true;
+        t["false"] = false;
+
+        std::string str = "$if true {{hoge}} ${true}";
+        std::list<char> input{str.begin(), str.end()};
+        TEST_EQ_T(input, "hoge 1", t);
     }
     if (failed != 0) {
         std::cerr << "------- TEST FAILED --------" << std::endl;

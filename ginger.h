@@ -9,6 +9,7 @@
 #include <map>
 #include <vector>
 #include <cassert>
+#include <iterator>
 
 namespace ginger {
 
@@ -612,9 +613,13 @@ internal::ios_type<IOS> from_ios(IOS&& ios) {
     return internal::ios_type<IOS>(std::forward<IOS>(ios));
 }
 
-template<class F>
-static void parse(std::string input, const temple& t, F out) {
-    internal::parser<std::string::iterator> p{input.begin(), input.end()};
+template<class Iterator>
+internal::parser<Iterator> make_parser(Iterator first, Iterator last) {
+    return internal::parser<Iterator>(first, last);
+}
+template<class Input, class F>
+static void parse(Input input, const temple& t, F out) {
+    auto p = make_parser(std::begin(input), std::end(input));
     internal::tmpl_context ctx;
     try {
         internal::block(p, t, ctx, false, out);
@@ -623,8 +628,17 @@ static void parse(std::string input, const temple& t, F out) {
     }
     out.flush();
 }
-static void parse(std::string input, const temple& t) {
-    parse(input, t, from_ios(std::cout));
+template<class Input>
+static void parse(Input input, const temple& t) {
+    parse(std::move(input), t, from_ios(std::cout));
+}
+template<class F>
+static void parse(const char* input, const temple& t, F out) {
+    // TODO: make iterator for const char*
+    parse(std::string(input), t, std::move(out));
+}
+static void parse(const char* input, const temple& t) {
+    parse(std::string(input), t, from_ios(std::cout));
 }
 
 }
