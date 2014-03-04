@@ -606,6 +606,43 @@ struct ios_type {
     ios_type& operator=(const ios_type&) = delete;
 };
 
+struct cstring : std::iterator<std::forward_iterator_tag, char> {
+    cstring() : p(nullptr) { }
+    cstring(const char* p) : p(p) { }
+    cstring(const cstring& c) : p(c.p) { }
+    cstring begin() { return cstring(p); }
+    cstring end() { return cstring(); }
+    cstring& operator++() {
+        assert(*p != '\0');
+        ++p;
+        return *this;
+    }
+    cstring operator++(int) {
+        assert(*p != '\0');
+        cstring t = *this;
+        ++p;
+        return t;
+    }
+    const char& operator*() {
+        return *p;
+    }
+    const char& operator*() const {
+        return *p;
+    }
+    friend bool operator==(const cstring& a, const cstring& b) {
+        return
+            not a.p && not b.p ? true :
+            not a.p &&     b.p ? *b.p == '\0' :
+                a.p && not b.p ? *a.p == '\0' :
+                                 a.p == b.p;
+    }
+    friend bool operator!=(const cstring& a, const cstring& b) {
+        return !(a == b);
+    }
+private:
+    const char* p;
+};
+
 }
 
 template<class IOS>
@@ -634,11 +671,10 @@ static void parse(Input input, const temple& t) {
 }
 template<class F>
 static void parse(const char* input, const temple& t, F out) {
-    // TODO: make iterator for const char*
-    parse(std::string(input), t, std::move(out));
+    parse(internal::cstring(input), t, std::move(out));
 }
 static void parse(const char* input, const temple& t) {
-    parse(std::string(input), t, from_ios(std::cout));
+    parse(internal::cstring(input), t, from_ios(std::cout));
 }
 
 }
