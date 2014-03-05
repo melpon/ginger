@@ -304,7 +304,7 @@ public:
 
     void read() {
         if (current_ == last_)
-            throw std::string("End of string suddenly at read()");
+            throw "End of string suddenly at read()";
         if (*current_ == '\n') {
             line_.clear();
             ++line_number_;
@@ -327,7 +327,7 @@ public:
     }
     char peek() const {
         if (current_ == last_)
-            throw std::string("Do not access end of string");
+            throw "Do not access end of string at peek()";
         return *current_;
     }
     bool has_next() const {
@@ -335,7 +335,7 @@ public:
     }
     char next() const {
         if (next_ == last_)
-            throw std::string("Next value is already end of string");
+            throw "Next value is already end of string";
         return *next_;
     }
 
@@ -354,7 +354,7 @@ public:
     template<class F>
     range_t read_while(F f) {
         if (current_ == last_)
-            throw std::string("End of string suddenly at read_while()");
+            throw "End of string suddenly at read_while()";
         auto first = current_;
         while (f(peek()))
             read();
@@ -385,7 +385,7 @@ public:
     range_t read_variable() {
         auto r = read_while([](char c) { return c > 32 && c != '.' && c != '{' && c != '}'; });
         if (r.first == r.second)
-            throw std::string("Did not find variable at read_variable().");
+            throw "Did not find variable at read_variable().";
         return r;
     }
     std::string read_variable_str() {
