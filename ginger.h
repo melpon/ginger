@@ -655,7 +655,7 @@ internal::parser<Iterator> make_parser(Iterator first, Iterator last) {
     return internal::parser<Iterator>(first, last);
 }
 template<class Input, class Dict, class F>
-static void parse(Input input, Dict&& t, F out) {
+static void parse(Input&& input, Dict&& t, F&& out) {
     auto p = make_parser(std::begin(input), std::end(input));
     internal::tmpl_context ctx;
     try {
@@ -666,12 +666,12 @@ static void parse(Input input, Dict&& t, F out) {
     out.flush();
 }
 template<class Input, class Dict>
-static void parse(Input input, Dict&& t) {
-    parse(std::move(input), std::forward<Dict>(t), from_ios(std::cout));
+static void parse(Input&& input, Dict&& t) {
+    parse(std::forward<Input>(input), std::forward<Dict>(t), from_ios(std::cout));
 }
 template<class Dict, class F>
-static void parse(const char* input, Dict&& t, F out) {
-    parse(internal::cstring(input), std::forward<Dict>(t), std::move(out));
+static void parse(const char* input, Dict&& t, F&& out) {
+    parse(internal::cstring(input), std::forward<Dict>(t), std::forward<F>(out));
 }
 template<class Dict>
 static void parse(const char* input, Dict&& t) {
