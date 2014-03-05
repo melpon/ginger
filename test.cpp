@@ -73,6 +73,7 @@ void test_exc(Input input, Dict dic, int line) {
 #define TEST_EXC_T(input, t) test_exc(input, t, __LINE__)
 
 int main() {
+    TEST_EQ("", "");
     TEST_EQ("Hello", "Hello");
     TEST_EQ("${{", "{{");
     TEST_EQ("$}}", "}}");

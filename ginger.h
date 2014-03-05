@@ -671,7 +671,11 @@ internal::parser<Iterator> make_parser(Iterator first, Iterator last) {
 }
 template<class Input, class Dict, class F>
 static void parse(Input&& input, Dict&& t, F&& out) {
-    auto p = make_parser(std::begin(input), std::end(input));
+    auto first = std::begin(input);
+    auto last = std::end(input);
+    if (first == last) return;
+
+    auto p = make_parser(first, last);
     internal::tmpl_context ctx;
     try {
         internal::block(p, t, ctx, false, out);
