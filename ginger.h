@@ -48,7 +48,7 @@ class object {
         }
         template<class>
         bool cond_(...) const {
-            throw __LINE__;
+            throw "This value does not evaluate.";
         }
         virtual bool cond() const override {
             return cond_<T>(0);
@@ -60,7 +60,7 @@ class object {
         }
         template<class>
         iterator begin_(...) {
-            throw __LINE__;
+            throw "This value does not have begin().";
         }
         virtual iterator begin() override {
             return begin_<T>(0);
@@ -72,7 +72,7 @@ class object {
         }
         template<class>
         iterator end_(...) {
-            throw __LINE__;
+            throw "This value does not have end().";
         }
         virtual iterator end() override {
             return end_<T>(0);
@@ -86,7 +86,7 @@ class object {
         }
         template<class U>
         std::string str_(...) const {
-            throw __LINE__;
+            throw "This value does not have operator<<().";
         }
         virtual std::string str() const override {
             return str_<T>(0);
@@ -98,7 +98,7 @@ class object {
         }
         template<class U>
         object get_(long, std::string, ...) {
-            throw __LINE__;
+            throw "This value does not have operator[]().";
         }
         virtual object get(std::string name) override {
             return get_<T>(0, std::move(name));
@@ -247,24 +247,38 @@ bool iterator::operator!=(iterator it) const {
 typedef std::map<std::string, object> temple;
 
 class parse_error : public std::exception {
+    std::string message_;
     int line_number_;
     std::string line1_;
     std::string line2_;
     std::string line_;
+    std::string long_error_;
 
 public:
-    parse_error(int line_number, std::string line1, std::string line2)
-        : line_number_(line_number)
+    parse_error(std::string message, int line_number, std::string line1, std::string line2)
+        : message_(std::move(message))
+        , line_number_(line_number)
         , line1_(line1)
         , line2_(line2) {
-        std::stringstream ss;
-        ss << "line " << line_number_ << ": " << line1_ << line2_ << std::endl;
-        line_ = ss.str();
+        {
+            std::stringstream ss;
+            ss << "line " << line_number_ << ": " << line1_ << line2_ << std::endl;
+            line_ = ss.str();
+        }
+        {
+            std::stringstream ss;
+            ss << "ERROR: " << message_ << "\n";
+            ss << "LINE: " << line_number_ << "\n";
+            ss << line1_ << line2_ << std::endl;
+            ss << std::string(line1_.length(), ' ') << '^' << "  <-- current cursor is here\n";
+            long_error_ = ss.str();
+        }
     }
     virtual const char* what() const noexcept { return line_.c_str(); }
     int line_number() const noexcept { return line_number_; }
     const std::string& line1() const noexcept { return line1_; }
     const std::string& line2() const noexcept { return line2_; }
+    const std::string& long_error() const noexcept { return long_error_; }
 };
 
 namespace internal {
@@ -290,7 +304,7 @@ public:
 
     void read() {
         if (current_ == last_)
-            throw __LINE__;
+            throw std::string("End of string suddenly at read()");
         if (*current_ == '\n') {
             line_.clear();
             ++line_number_;
@@ -301,11 +315,11 @@ public:
         if (next_ != last_)
             ++next_;
     }
-    parse_error read_error() {
+    parse_error read_error(std::string message) {
         std::string line;
         while (current_ != last_ && *current_ != '\n')
             line.push_back(*current_++);
-        return parse_error(line_number_, line_, line);
+        return parse_error(std::move(message), line_number_, line_, line);
     }
 
     explicit operator bool() const {
@@ -313,7 +327,7 @@ public:
     }
     char peek() const {
         if (current_ == last_)
-            throw __LINE__;
+            throw std::string("Do not access end of string");
         return *current_;
     }
     bool has_next() const {
@@ -321,7 +335,7 @@ public:
     }
     char next() const {
         if (next_ == last_)
-            throw __LINE__;
+            throw std::string("Next value is already end of string");
         return *next_;
     }
 
@@ -340,7 +354,7 @@ public:
     template<class F>
     range_t read_while(F f) {
         if (current_ == last_)
-            throw __LINE__;
+            throw std::string("End of string suddenly at read_while()");
         auto first = current_;
         while (f(peek()))
             read();
@@ -371,7 +385,7 @@ public:
     range_t read_variable() {
         auto r = read_while([](char c) { return c > 32 && c != '.' && c != '{' && c != '}'; });
         if (r.first == r.second)
-            throw __LINE__;
+            throw std::string("Did not find variable at read_variable().");
         return r;
     }
     std::string read_variable_str() {
@@ -381,7 +395,7 @@ public:
 
     void eat(char c) {
         if (peek() != c)
-            throw __LINE__;
+            throw std::string("Unexpected character ") + peek() + ". Expected character is " + c;
         read();
     }
     void eat(const char* p) {
@@ -426,7 +440,7 @@ object get_variable(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, boo
             if (it2 != dic.end()) {
                 obj = it2->second;
             } else {
-                throw __LINE__;
+                throw std::string("Variable \"") + var + "\" is not found";
             }
         }
         while (p.peek() == '.') {
@@ -497,15 +511,16 @@ void block(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, bool skip, F
                     if (not skip)
                         output_string(out, "}}");
                 } else {
-                    throw __LINE__;
+                    throw std::string("Unexpected character '") + c + "'. It must be '}' after \"$}\"";
                 }
             } else {
                 auto command = p.read_ident();
                 if (p.equal(command, "for")) {
                     // $for x in xs {{ <block> }}
                     auto var1 = p.read_ident_str();
-                    if (not p.equal(p.read_ident(), "in"))
-                        throw __LINE__;
+                    auto in = p.read_ident();
+                    if (not p.equal(in, "in"))
+                        throw "Unexpected string \"" + std::string(in.first, in.second) + "\". It must be \"in\"";
                     object obj = get_variable(p, dic, ctx, skip);
                     p.eat_with_whitespace("{{");
 
@@ -576,12 +591,12 @@ void block(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, bool skip, F
                         }
                     }
                 } else {
-                    throw __LINE__;
+                    throw "Unexpected command " + std::string(command.first, command.second) + ". It must be \"for\" or \"if\"";
                 }
             }
         } else {
             assert(false && "must not go through.");
-            throw __LINE__;
+            throw "Must not go through.";
         }
     }
 }
@@ -660,8 +675,10 @@ static void parse(Input&& input, Dict&& t, F&& out) {
     internal::tmpl_context ctx;
     try {
         internal::block(p, t, ctx, false, out);
-    } catch (int) {
-        throw p.read_error();
+    } catch (std::string message) {
+        throw p.read_error(std::move(message));
+    } catch (...) {
+        throw p.read_error("unexpected error");
     }
     out.flush();
 }

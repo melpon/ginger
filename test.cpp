@@ -31,7 +31,7 @@ void print_error(int line, Input input, std::string expected, std::string actual
     std::cerr << "input: " << std::string(std::begin(input), std::end(input)) << std::endl;
     std::cerr << "expected: " << expected << std::endl;
     std::cerr << "actual: " << actual << std::endl;
-    std::cerr << "error: " <<  error << std::endl;
+    std::cerr << error << std::endl;
     ++failed;
 }
 void print_error(int line, const char* input, std::string expected, std::string actual, std::string error = "") {
@@ -48,9 +48,7 @@ void test_eq(Input input, std::string expected, Dict dic, int line) {
             print_error(line, input, expected, actual, "");
         }
     } catch (const ginger::parse_error& error) {
-        std::stringstream ss;
-        ss << "line " << error.line_number() << ": [" << error.line1() << "][" << error.line2() << "]" << std::endl;
-        print_error(line, input, expected, "PARSE ERROR", ss.str());
+        print_error(line, input, expected, "PARSE ERROR", error.long_error());
     } catch (...) {
         print_error(line, input, expected, "UNKNOWN EXCEPTION", "");
     }
@@ -63,6 +61,8 @@ void test_exc(Input input, Dict dic, int line) {
         auto actual = ss.str();
         print_error(line, input, "THROW PARSE ERROR", actual, "");
     } catch (ginger::parse_error& error) {
+        //visible errors.
+        //std::cout << error.long_error();
     } catch (...) {
         print_error(line, input, "THROW PARSE ERROR", "UNKNOWN EXCEPTION", "");
     }
