@@ -665,17 +665,13 @@ internal::ios_type<IOS> from_ios(IOS&& ios) {
     return internal::ios_type<IOS>(std::forward<IOS>(ios));
 }
 
-template<class Iterator>
-internal::parser<Iterator> make_parser(Iterator first, Iterator last) {
-    return internal::parser<Iterator>(first, last);
-}
 template<class Input, class Dict, class F>
 static void parse(Input&& input, Dict&& t, F&& out) {
     auto first = std::begin(input);
     auto last = std::end(input);
     if (first == last) return;
 
-    auto p = make_parser(first, last);
+    auto p = internal::parser<decltype(first)>(first, last);
     internal::tmpl_context ctx;
     try {
         internal::block(p, t, ctx, false, out);
