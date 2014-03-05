@@ -105,82 +105,6 @@ class object {
         }
     };
 
-    template<class Cond, class Begin, class End, class Str, class Get>
-    struct holder_impl2 : holder {
-        Cond fcond_;
-        Begin fbegin_;
-        End fend_;
-        Str fstr_;
-        Get fget_;
-
-        holder_impl2(Cond cond, Begin begin, End end, Str str, Get get)
-            : fcond_(std::move(cond))
-            , fbegin_(std::move(begin))
-            , fend_(std::move(end))
-            , fstr_(std::move(str))
-            , fget_(std::move(get)) { }
-
-        template<class U, int = sizeof(std::declval<U>()())>
-        bool cond_(int) const {
-            return fcond_();
-        }
-        template<class>
-        bool cond_(...) const {
-            throw __LINE__;
-        }
-        virtual bool cond() const override {
-            return cond_<Cond>();
-        }
-
-        template<class U, int = sizeof(std::declval<U>()())>
-        bool begin_(int) const {
-            return fbegin_();
-        }
-        template<class>
-        bool begin_(...) const {
-            throw __LINE__;
-        }
-        virtual iterator begin() override {
-            return begin_<Begin>();
-        }
-
-        template<class U, int = sizeof(std::declval<U>()())>
-        bool xend_(int) const {
-            return fend_();
-        }
-        template<class>
-        bool xend_(...) const {
-            throw __LINE__;
-        }
-        virtual iterator end() override {
-            return xend_<End>();
-        }
-
-        template<class U, int = sizeof(std::declval<U>()())>
-        bool str_(int) const {
-            return fstr_();
-        }
-        template<class>
-        bool str_(...) const {
-            throw __LINE__;
-        }
-        virtual std::string str() const override {
-            return str_<Str>();
-        }
-
-        template<class U, int = sizeof(std::declval<U>()())>
-        bool get_(int, std::string name) const {
-            return fget_(std::move(name));
-        }
-        template<class>
-        bool get_(long, std::string, ...) const {
-            throw __LINE__;
-        }
-        virtual object get(std::string name) override {
-            return get_<Get>();
-        }
-    };
-
     std::shared_ptr<holder> holder_;
 
 public:
@@ -201,13 +125,6 @@ public:
     iterator end() { return holder_->end(); }
     std::string str() const { return holder_->str(); }
     object operator[](std::string name) { return holder_->get(std::move(name)); }
-
-    template<class Cond, class Begin, class End, class Str, class Get>
-    static object create(Cond cond, Begin begin, End end, Str str, Get get) {
-        object obj;
-        obj.holder_.reset(new holder_impl2<Cond, Begin, End, Str, Get>(std::move(cond), std::move(begin), std::move(end), std::move(str), std::move(get)));
-        return obj;
-    }
 };
 
 struct iterator::holder {
