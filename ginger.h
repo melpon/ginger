@@ -405,8 +405,8 @@ void output_string(F& out, const char (&s)[N]) {
     out.put(s, s + N - 1);
 }
 
-template<class Iterator>
-object get_variable(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, bool skip) {
+template<class Iterator, class Dict>
+object get_variable(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, bool skip) {
     p.skip_whitespace();
     if (skip) {
         p.read_variable();
@@ -438,8 +438,8 @@ object get_variable(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, b
     }
 }
 
-template<class Iterator, class F>
-void block(parser<Iterator>& p, const temple& dic, tmpl_context& ctx, bool skip, F& out) {
+template<class Iterator, class Dict, class F>
+void block(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, bool skip, F& out) {
     while (p) {
         auto r = p.read_while_or_eof([](char c) { return c != '}' && c != '$'; });
         if (not skip)
@@ -654,8 +654,8 @@ template<class Iterator>
 internal::parser<Iterator> make_parser(Iterator first, Iterator last) {
     return internal::parser<Iterator>(first, last);
 }
-template<class Input, class F>
-static void parse(Input input, const temple& t, F out) {
+template<class Input, class Dict, class F>
+static void parse(Input input, Dict&& t, F out) {
     auto p = make_parser(std::begin(input), std::end(input));
     internal::tmpl_context ctx;
     try {
@@ -665,16 +665,17 @@ static void parse(Input input, const temple& t, F out) {
     }
     out.flush();
 }
-template<class Input>
-static void parse(Input input, const temple& t) {
-    parse(std::move(input), t, from_ios(std::cout));
+template<class Input, class Dict>
+static void parse(Input input, Dict&& t) {
+    parse(std::move(input), std::forward<Dict>(t), from_ios(std::cout));
 }
-template<class F>
-static void parse(const char* input, const temple& t, F out) {
-    parse(internal::cstring(input), t, std::move(out));
+template<class Dict, class F>
+static void parse(const char* input, Dict&& t, F out) {
+    parse(internal::cstring(input), std::forward<Dict>(t), std::move(out));
 }
-static void parse(const char* input, const temple& t) {
-    parse(internal::cstring(input), t, from_ios(std::cout));
+template<class Dict>
+static void parse(const char* input, Dict&& t) {
+    parse(internal::cstring(input), std::forward<Dict>(t), from_ios(std::cout));
 }
 
 }

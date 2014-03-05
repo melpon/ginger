@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <list>
+#include <unordered_map>
 
 std::string getStdin() {
     std::string output;
@@ -37,11 +38,11 @@ void print_error(int line, const char* input, std::string expected, std::string 
     print_error(line, std::string(input), expected, actual, error);
 }
 
-template<class Input>
-void test_eq(Input input, std::string expected, ginger::temple* p, int line) {
+template<class Input, class Dict>
+void test_eq(Input input, std::string expected, Dict dic, int line) {
     try {
         std::stringstream ss;
-        ginger::parse(input, p ? *p : ginger::temple(), ginger::from_ios(ss));
+        ginger::parse(input, dic, ginger::from_ios(ss));
         auto actual = ss.str();
         if (actual != expected) {
             print_error(line, input, expected, actual, "");
@@ -54,11 +55,11 @@ void test_eq(Input input, std::string expected, ginger::temple* p, int line) {
         print_error(line, input, expected, "UNKNOWN EXCEPTION", "");
     }
 }
-template<class Input>
-void test_exc(Input input, ginger::temple* p, int line) {
+template<class Input, class Dict>
+void test_exc(Input input, Dict dic, int line) {
     try {
         std::stringstream ss;
-        ginger::parse(input, p ? *p : ginger::temple(), ginger::from_ios(ss));
+        ginger::parse(input, dic, ginger::from_ios(ss));
         auto actual = ss.str();
         print_error(line, input, "THROW PARSE ERROR", actual, "");
     } catch (ginger::parse_error& error) {
@@ -66,10 +67,10 @@ void test_exc(Input input, ginger::temple* p, int line) {
         print_error(line, input, "THROW PARSE ERROR", "UNKNOWN EXCEPTION", "");
     }
 }
-#define TEST_EQ(input, expected) test_eq(input, expected, nullptr, __LINE__)
-#define TEST_EQ_T(input, expected, t) test_eq(input, expected, &t, __LINE__)
-#define TEST_EXC(input) test_exc(input, nullptr, __LINE__)
-#define TEST_EXC_T(input, t) test_exc(input, &t, __LINE__)
+#define TEST_EQ(input, expected) test_eq(input, expected, ginger::temple(), __LINE__)
+#define TEST_EQ_T(input, expected, t) test_eq(input, expected, t, __LINE__)
+#define TEST_EXC(input) test_exc(input, ginger::temple(), __LINE__)
+#define TEST_EXC_T(input, t) test_exc(input, t, __LINE__)
 
 int main() {
     TEST_EQ("Hello", "Hello");
@@ -155,6 +156,12 @@ int main() {
         std::string str = "$if true {{hoge}} ${true}";
         std::list<char> input{str.begin(), str.end()};
         TEST_EQ_T(input, "hoge 1", t);
+    }
+    // test Generic Dictionary
+    {
+        std::unordered_map<std::string, ginger::object> t;
+        t["value"] = 100;
+        TEST_EQ_T("${value}", "100", t);
     }
     if (failed != 0) {
         std::cerr << "------- TEST FAILED --------" << std::endl;
