@@ -523,7 +523,7 @@ static internal::output_type<IOS> from_ios(IOS&& ios) {
 }
 
 template<class Input, class Dictionary, class Output>
-static void parse(Input&& input, Dictionary&& t, Output&& out) {
+static void parse(Input&& input, Dictionary&& dic, Output&& out) {
     auto first = std::begin(input);
     auto last = std::end(input);
     if (first == last) return;
@@ -531,7 +531,7 @@ static void parse(Input&& input, Dictionary&& t, Output&& out) {
     auto p = internal::parser<decltype(first)>(first, last);
     internal::tmpl_context ctx;
     try {
-        internal::block(p, t, ctx, false, out);
+        internal::block(p, dic, ctx, false, out);
     } catch (std::string message) {
         throw p.read_error(std::move(message));
     } catch (...) {
@@ -540,16 +540,16 @@ static void parse(Input&& input, Dictionary&& t, Output&& out) {
     out.flush();
 }
 template<class Input, class Dictionary>
-static void parse(Input&& input, Dictionary&& t) {
-    parse(std::forward<Input>(input), std::forward<Dictionary>(t), from_ios(std::cout));
+static void parse(Input&& input, Dictionary&& dic) {
+    parse(std::forward<Input>(input), std::forward<Dictionary>(dic), from_ios(std::cout));
 }
 template<class Dictionary, class Output>
-static void parse(const char* input, Dictionary&& t, Output&& out) {
-    parse(internal::cstring(input), std::forward<Dictionary>(t), std::forward<F>(out));
+static void parse(const char* input, Dictionary&& dic, Output&& out) {
+    parse(internal::cstring(input), std::forward<Dictionary>(dic), std::forward<Output>(out));
 }
 template<class Dictionary>
-static void parse(const char* input, Dictionary&& t) {
-    parse(internal::cstring(input), std::forward<Dictionary>(t), from_ios(std::cout));
+static void parse(const char* input, Dictionary&& dic) {
+    parse(internal::cstring(input), std::forward<Dictionary>(dic), from_ios(std::cout));
 }
 
 }
