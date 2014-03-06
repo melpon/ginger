@@ -459,9 +459,9 @@ static void block(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, bool 
 }
 
 template<class IOS>
-struct ios_type {
+struct output_type {
     IOS ios;
-    ios_type(IOS ios) : ios(std::forward<IOS>(ios)) { }
+    output_type(IOS ios) : ios(std::forward<IOS>(ios)) { }
 
     template<class Iterator>
     void put(Iterator first, Iterator last) {
@@ -471,11 +471,11 @@ struct ios_type {
         ios << std::flush;
     }
 
-    ios_type(ios_type&&) = default;
-    ios_type& operator=(ios_type&&) = default;
+    output_type(output_type&&) = default;
+    output_type& operator=(output_type&&) = default;
 
-    ios_type(const ios_type&) = delete;
-    ios_type& operator=(const ios_type&) = delete;
+    output_type(const output_type&) = delete;
+    output_type& operator=(const output_type&) = delete;
 };
 
 struct cstring : std::iterator<std::forward_iterator_tag, char> {
@@ -518,8 +518,8 @@ private:
 }
 
 template<class IOS>
-static internal::ios_type<IOS> from_ios(IOS&& ios) {
-    return internal::ios_type<IOS>(std::forward<IOS>(ios));
+static internal::output_type<IOS> from_ios(IOS&& ios) {
+    return internal::output_type<IOS>(std::forward<IOS>(ios));
 }
 
 template<class Input, class Dict, class F>
