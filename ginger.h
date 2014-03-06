@@ -168,7 +168,7 @@ class parse_error : public std::exception {
     int line_number_;
     std::string line1_;
     std::string line2_;
-    std::string line_;
+    std::string what_;
     std::string long_error_;
 
 public:
@@ -179,8 +179,8 @@ public:
         , line2_(line2) {
         {
             std::stringstream ss;
-            ss << "line " << line_number_ << ": " << line1_ << line2_ << std::endl;
-            line_ = ss.str();
+            ss << "line " << line_number_ << ": " << message_ << std::endl;
+            what_ = ss.str();
         }
         {
             std::stringstream ss;
@@ -191,7 +191,7 @@ public:
             long_error_ = ss.str();
         }
     }
-    virtual const char* what() const noexcept { return line_.c_str(); }
+    virtual const char* what() const noexcept { return what_.c_str(); }
     int line_number() const noexcept { return line_number_; }
     const std::string& line1() const noexcept { return line1_; }
     const std::string& line2() const noexcept { return line2_; }
