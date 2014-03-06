@@ -79,13 +79,13 @@ Result::
       <ul>
         
           
-            <li href="http://example.com">Example</li>
+            <li><a href="http://example.com">Example</a></li>
           
         
           
         
           
-            <li href="http://google.com">Google</li>
+            <li><a href="http://google.com">Google</a></li>
           
         
       </ul>

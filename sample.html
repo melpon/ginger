@@ -7,7 +7,7 @@
     <ul>
       $for x in xs {{
         $if x.enable {{
-          <li href="${x.url}">${x.value}</li>
+          <li><a href="${x.url}">${x.value}</a></li>
         }}
       }}
     </ul>
