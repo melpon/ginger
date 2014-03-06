@@ -13,26 +13,11 @@
 
 namespace ginger {
 
-class object;
-class iterator {
-    struct holder;
-    template<class T> struct holder_impl;
-
-    std::shared_ptr<holder> holder_;
-public:
-    template<class T> iterator(T it);
-
-    void operator++();
-    object operator*();
-    bool operator!=(iterator it) const;
-};
-
 class object {
     struct holder {
         virtual ~holder() { }
         virtual bool cond() const = 0;
-        virtual iterator begin() = 0;
-        virtual iterator end() = 0;
+        virtual void map(const std::function<void (object)>& f) const = 0;
         virtual std::string str() const = 0;
         virtual object get(std::string name) = 0;
     };
@@ -54,29 +39,19 @@ class object {
             return cond_<T>(0);
         }
 
-        template<class U, std::size_t = sizeof(std::declval<U>().begin(), std::declval<U>().end())>
-        iterator begin_(short) {
-            return obj.begin();
+        template<class U, int = sizeof(std::declval<U>().begin(), std::declval<U>().end())>
+        void map_(int, const std::function<void (object)>& f) const {
+            for (auto&& v: obj) {
+                f(v);
+            }
         }
         template<class>
-        iterator begin_(...) {
-            throw "This value does not have begin().";
+        void map_(long, const std::function<void (object)>&, ...) const {
+            throw "This value does not have begin() or end().";
         }
-        virtual iterator begin() override {
-            return begin_<T>(0);
+        virtual void map(const std::function<void (object)>& f) const override {
+            map_<T>(0, f);
         };
-
-        template<class U, std::size_t = sizeof(std::declval<U>().begin(), std::declval<U>().end())>
-        iterator end_(short) {
-            return obj.end();
-        }
-        template<class>
-        iterator end_(...) {
-            throw "This value does not have end().";
-        }
-        virtual iterator end() override {
-            return end_<T>(0);
-        }
 
         template<class U, int = sizeof(std::declval<std::stringstream&>() << std::declval<U>())>
         std::string str_(int) const {
@@ -121,45 +96,10 @@ public:
     void operator=(T v) { holder_.reset(new holder_impl<T>(std::move(v))); }
 
     explicit operator bool() const { return holder_->cond(); }
-    iterator begin() { return holder_->begin(); }
-    iterator end() { return holder_->end(); }
+    void map(const std::function<void (object)>& f) const { holder_->map(f); }
     std::string str() const { return holder_->str(); }
     object operator[](std::string name) { return holder_->get(std::move(name)); }
 };
-
-struct iterator::holder {
-    virtual ~holder() { }
-    virtual void operator++() = 0;
-    virtual object operator*() = 0;
-    virtual bool operator!=(iterator it) const = 0;
-};
-template<class T>
-struct iterator::holder_impl : iterator::holder {
-    T it;
-    holder_impl(T it) : it(std::move(it)) { }
-    virtual void operator++() override {
-        ++it;
-    }
-    virtual object operator*() override {
-        return *it;
-    }
-    virtual bool operator!=(iterator it) const override {
-        return this->it != std::static_pointer_cast<holder_impl<T>>(it.holder_)->it;
-    }
-};
-template<class T>
-iterator::iterator(T it)
-    : holder_(new iterator::holder_impl<T>(std::move(it))) { }
-
-void iterator::operator++() {
-    holder_->operator++();
-}
-object iterator::operator*() {
-    return holder_->operator*();
-}
-bool iterator::operator!=(iterator it) const {
-    return holder_->operator!=(it);
-}
 
 typedef std::map<std::string, object> temple;
 
@@ -446,12 +386,12 @@ void block(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, bool skip, F
                     } else {
                         auto context = p.save();
                         auto& vec = ctx[var1];
-                        for (object v: obj) {
-                            vec.push_back(v);
+                        obj.map([&](object v) {
+                            vec.push_back(std::move(v));
                             block(p, dic, ctx, skip, out);
                             vec.pop_back();
                             p.load(context);
-                        }
+                        });
                         block(p, dic, ctx, true, out);
                     }
                     p.eat("}}");
