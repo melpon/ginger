@@ -6,5 +6,5 @@ if [[ $? -eq 0 ]]; then
 else
   g++ test.cpp -o test -std=c++11
 fi
-cat "test.html" | ./test
+./test
 rm test
