@@ -272,12 +272,12 @@ public:
 };
 
 template<class F, std::size_t N>
-void output_string(F& out, const char (&s)[N]) {
+static void output_string(F& out, const char (&s)[N]) {
     out.put(s, s + N - 1);
 }
 
 template<class Iterator, class Dict>
-object get_variable(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, bool skip) {
+static object get_variable(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, bool skip) {
     p.skip_whitespace();
     if (skip) {
         p.read_variable();
@@ -310,7 +310,7 @@ object get_variable(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, boo
 }
 
 template<class Iterator, class Dict, class F>
-void block(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, bool skip, F& out) {
+static void block(parser<Iterator>& p, const Dict& dic, tmpl_context& ctx, bool skip, F& out) {
     while (p) {
         auto r = p.read_while_or_eof([](char c) { return c != '}' && c != '$'; });
         if (not skip)
@@ -518,7 +518,7 @@ private:
 }
 
 template<class IOS>
-internal::ios_type<IOS> from_ios(IOS&& ios) {
+static internal::ios_type<IOS> from_ios(IOS&& ios) {
     return internal::ios_type<IOS>(std::forward<IOS>(ios));
 }
 
