@@ -98,8 +98,6 @@ Requirements
 Input
 -----
 
-- forwardable.
-
 - below expression should be valid::
 
     auto first = std::begin(input);
@@ -111,8 +109,6 @@ Input
 Dictionary
 ----------
 
-- Forwardable.
-
 - Below expressions should be valid::
 
     std::string var;
@@ -123,8 +119,6 @@ Dictionary
 
 Output
 ------
-
-- Forwardable.
 
 - Below expression should be valid::
 
