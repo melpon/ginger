@@ -24,23 +24,13 @@ Source code is here::
 
   #include "ginger.h"
   #include <iostream>
+  #include <sstream>
   #include <ios>
   #include <vector>
   #include <map>
   #include <string>
 
-  std::string getStdin() {
-      std::string output;
-      std::string input;
-      std::cin >> std::noskipws;
-      while (std::getline(std::cin, input)) {
-          output += input + '\n';
-      }
-      return output;
-  }
-
   int main() {
-      ginger::temple t;
       std::vector<std::map<std::string, ginger::object>> xs;
       xs.push_back({
           { "enable", true },
@@ -57,12 +47,15 @@ Source code is here::
           { "url", "http://google.com" },
           { "value", "Google" },
       });
+
+      std::map<std::string, ginger::object> t;
       t["title"] = "Sample Site";
       t["xs"] = xs;
 
-      std::string input = getStdin();
+      std::stringstream ss;
+      ss << std::cin.rdbuf();
       try {
-          ginger::parse(input, t);
+          ginger::parse(ss.str(), t);
       } catch (ginger::parse_error& error) {
           std::cerr << error.long_error() << std::endl;
       }
