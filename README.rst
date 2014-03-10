@@ -25,7 +25,6 @@ Source code is here::
   #include "ginger.h"
   #include <iostream>
   #include <sstream>
-  #include <ios>
   #include <vector>
   #include <map>
   #include <string>
