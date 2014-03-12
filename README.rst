@@ -2,7 +2,9 @@
 ginger
 ======
 
-Template is here::
+Template is here
+
+.. sourcecode:: html
 
   <html>
     <head>
@@ -20,7 +22,9 @@ Template is here::
     </body>
   </html>
 
-Source code is here::
+Source code is here
+
+.. sourcecode:: cpp
 
   #include "ginger.h"
   #include <iostream>
@@ -60,7 +64,9 @@ Source code is here::
       }
   }
 
-Result::
+Result
+
+.. sourcecode:: html
 
   <html>
     <head>
@@ -90,7 +96,9 @@ Requirements
 Input
 -----
 
-- below expression should be valid::
+- below expression should be valid
+
+  .. sourcecode:: cpp
 
     auto first = std::begin(input);
     auto last = std::end(input);
@@ -101,7 +109,9 @@ Input
 Dictionary
 ----------
 
-- Below expressions should be valid::
+- Below expressions should be valid
+
+  .. sourcecode:: cpp
 
     std::string var;
     auto it = dic.find(var);
@@ -112,9 +122,11 @@ Dictionary
 Output
 ------
 
-- Below expression should be valid::
+- Below expression should be valid
 
-    // Output output; // default constructible does not require.
+  .. sourcecode:: cpp
+
+    // Output output; // default constructible is not required.
     // For any ForwardIterator first, last
     output.put(first, last);
     output.flush();
@@ -127,7 +139,7 @@ object
 
 Class ``object`` can construct from any value.
 
-::
+.. sourcecode:: cpp
 
   class object {
   public:
@@ -144,7 +156,7 @@ Class ``object`` can construct from any value.
 parse
 -----
 
-::
+.. sourcecode:: cpp
 
   template<class Input, class Dictionary>
   void parse(Input&& input, Dictionary&& t);
